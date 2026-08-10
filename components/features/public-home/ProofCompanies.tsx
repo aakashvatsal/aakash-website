@@ -164,6 +164,9 @@ export function ProofCompanies({
             name={
               company.name
             }
+            slug={
+              company.slug
+            }
             title={
               company.tagline ||
               company.currentFocus ||
