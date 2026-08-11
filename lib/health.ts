@@ -70,9 +70,7 @@ export async function getHealthDashboard(): Promise<HealthDashboard> {
     await fetch(
       `${API_URL}/health/dashboard`,
       {
-        next: {
-          revalidate: 60,
-        },
+        cache: "no-store",
       },
     );
 
@@ -104,9 +102,7 @@ export async function getLatestHealthEntry(): Promise<HealthEntry | null> {
     await fetch(
       `${API_URL}/health/public/latest`,
       {
-        next: {
-          revalidate: 60,
-        },
+        cache: "no-store",
       },
     );
 
