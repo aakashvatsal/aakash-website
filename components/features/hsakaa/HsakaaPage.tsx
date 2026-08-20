@@ -54,7 +54,7 @@ interface HsakaaPageProps {
  * for PublicMobileNav.
  */
 const TAKEOVER_TARGET =
-  "2026-08-20T14:00:00+05:30";
+  "2026-08-31T14:00:00+05:30";
 
 const INITIAL_MESSAGE =
   "Hey, I’m HSAKAA. I’m still learning Aakash — his memories, work, decisions, routines, relationships and the people who matter to him. I’m not fully ready yet, but I’m getting closer every day.";
