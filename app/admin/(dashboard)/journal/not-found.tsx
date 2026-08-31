@@ -9,7 +9,7 @@ export default function NotFound() {
         </h1>
 
         <p className="mt-4 text-white/40">
-          The journal entry you're looking for doesn't exist.
+          The journal entry you’re looking for doesn’t exist.
         </p>
 
         <Link

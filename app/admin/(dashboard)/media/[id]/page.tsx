@@ -14,6 +14,12 @@ export default async function EditMediaPage({
 }: EditMediaPageProps) {
     const { id } = await params;
 
+    // Only legacy media_posts use this editor. Reserved/static Media routes
+    // must never fall through to this dynamic segment as fake document IDs.
+    if (!/^[a-f\d]{24}$/i.test(id)) {
+        notFound();
+    }
+
     const post =
         await getMediaPostById(id);
 

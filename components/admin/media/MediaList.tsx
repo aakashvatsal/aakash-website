@@ -1,8 +1,5 @@
 import Link from "next/link";
-import {
-  FileSearch,
-  Plus,
-} from "lucide-react";
+import { FileSearch } from "lucide-react";
 
 import type {
   MediaPagination,
@@ -69,11 +66,10 @@ export function MediaList({
           </div>
 
           <Link
-            href="/admin/media/new"
-            className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-[16px] bg-[#C6FF32] px-5 text-sm font-black text-[#030608] transition hover:brightness-95"
+            href="/admin/hsakaa/chat"
+            className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-[16px] bg-[#C6FF32] px-5 text-sm font-black text-[#030608] transition hover:brightness-95"
           >
-            <Plus className="h-4 w-4" />
-            New media post
+            Create with HSAKAA
           </Link>
         </div>
 
@@ -155,7 +151,7 @@ function MediaEmptyState({
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/35">
         {filtered
           ? "No posts match the current search and filter settings."
-          : "Create your first media post to begin planning, publishing and evaluating content."}
+          : "New content is created by HSAKAA. This screen remains the historical and editing view for Media records."}
       </p>
 
       {filtered ? (
@@ -167,11 +163,10 @@ function MediaEmptyState({
         </Link>
       ) : (
         <Link
-          href="/admin/media/new"
-          className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-[#C6FF32] px-5 text-sm font-black text-[#030608] transition hover:brightness-95"
+          href="/admin/hsakaa/chat"
+          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-[14px] bg-[#C6FF32] px-5 text-sm font-black text-[#030608] transition hover:brightness-95"
         >
-          <Plus className="h-4 w-4" />
-          Create media post
+          Create with HSAKAA
         </Link>
       )}
     </div>

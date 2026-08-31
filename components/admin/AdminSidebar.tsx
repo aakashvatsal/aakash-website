@@ -8,22 +8,34 @@ import {
 import { useState } from "react";
 
 import {
+  Activity,
   Bot,
+  BellRing,
   BookOpen,
   Brain,
   Building2,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   Clock3,
+  CheckSquare2,
+  Clapperboard,
   ExternalLink,
   FlaskConical,
   HeartPulse,
+  Pill,
+  Utensils,
   LayoutDashboard,
   Loader2,
+  MessageCircle,
+  Network,
+  Search,
+  ShieldCheck,
   LogOut,
   Newspaper,
   Radio,
   Settings,
+  TrendingUp,
   UserRound,
 } from "lucide-react";
 
@@ -63,18 +75,125 @@ const navigation: NavigationItem[] = [
   },
   {
     title: "Health",
-    href: "/admin/health",
     icon: HeartPulse,
+    children: [
+      {
+        title: "Overview",
+        href: "/admin/health",
+        icon: HeartPulse,
+      },
+      {
+        title: "Diet",
+        href: "/admin/health/diet",
+        icon: Utensils,
+      },
+      {
+        title: "Supplements",
+        href: "/admin/health/supplements",
+        icon: Pill,
+      },
+      {
+        title: "Meditation",
+        href: "/admin/health/meditation",
+        icon: Brain,
+      },
+      {
+        title: "Skincare",
+        href: "/admin/health/skincare",
+        icon: HeartPulse,
+      },
+      {
+        title: "Haircare",
+        href: "/admin/health/haircare",
+        icon: Activity,
+      },
+      {
+        title: "Intimate Care",
+        href: "/admin/health/intimate-care",
+        icon: HeartPulse,
+      },
+      {
+        title: "Products",
+        href: "/admin/health/products",
+        icon: BookOpen,
+      },
+      {
+        title: "Reports",
+        href: "/admin/health/reports",
+        icon: Activity,
+      },
+    ],
   },
   {
     title: "Media",
-    href: "/admin/media",
     icon: Radio,
+    children: [
+      {
+        title: "Overview",
+        href: "/admin/media",
+        icon: Radio,
+      },
+      {
+        title: "Content Director",
+        href: "/admin/media/director",
+        icon: Bot,
+      },
+      {
+        title: "Production Studio",
+        href: "/admin/media/production",
+        icon: Clapperboard,
+      },
+      {
+        title: "7-Day Calendar",
+        href: "/admin/media/calendar",
+        icon: CalendarDays,
+      },
+      {
+        title: "Growth Analytics",
+        href: "/admin/media/growth",
+        icon: TrendingUp,
+      },
+      {
+        title: "Engagement Inbox",
+        href: "/admin/media/engagement",
+        icon: MessageCircle,
+      },
+      {
+        title: "Growth Autopilot",
+        href: "/admin/media/autopilot",
+        icon: Bot,
+      },
+      {
+        title: "Media Core",
+        href: "/admin/media/core",
+        icon: Radio,
+      },
+      {
+        title: "Content Memory",
+        href: "/admin/media/intelligence",
+        icon: Brain,
+      },
+    ],
   },
   {
     title: "Now",
     href: "/admin/now",
     icon: Clock3,
+  },
+  {
+    title: "Tasks",
+    href: "/admin/tasks",
+    icon: CheckSquare2,
+  },
+  {
+    title: "Reminders",
+    href: "/admin/reminders",
+    icon: BellRing,
+  },
+  {
+    title: "Brain Dump",
+    href: "/admin/brain-dump",
+    icon: Brain,
   },
   {
     title: "HSAKAA",
@@ -86,6 +205,11 @@ const navigation: NavigationItem[] = [
         icon: LayoutDashboard,
       },
       {
+        title: "Private Chat",
+        href: "/admin/hsakaa/chat",
+        icon: Bot,
+      },
+      {
         title: "People",
         href: "/admin/hsakaa/people",
         icon: UserRound,
@@ -94,6 +218,41 @@ const navigation: NavigationItem[] = [
         title: "Memory",
         href: "/admin/hsakaa/memory",
         icon: Brain,
+      },
+      {
+        title: "Knowledge Graph",
+        href: "/admin/hsakaa/graph",
+        icon: Network,
+      },
+      {
+        title: "Universal Search",
+        href: "/admin/hsakaa/search",
+        icon: Search,
+      },
+      {
+        title: "Context Engine",
+        href: "/admin/hsakaa/context",
+        icon: Brain,
+      },
+      {
+        title: "Proactive OS",
+        href: "/admin/hsakaa/proactive",
+        icon: BellRing,
+      },
+      {
+        title: "Operations",
+        href: "/admin/hsakaa/operations",
+        icon: Activity,
+      },
+      {
+        title: "Release Readiness",
+        href: "/admin/hsakaa/release-readiness",
+        icon: ShieldCheck,
+      },
+      {
+        title: "Intelligence",
+        href: "/admin/hsakaa/intelligence",
+        icon: Activity,
       },
       {
         title: "Playground",
@@ -126,8 +285,8 @@ function isRouteActive(
    * Otherwise HSAKAA child routes would
    * also highlight Overview.
    */
-  if (href === "/admin/hsakaa") {
-    return pathname === "/admin/hsakaa";
+  if (href === "/admin/hsakaa" || href === "/admin/health") {
+    return pathname === href;
   }
 
   return (
@@ -144,6 +303,9 @@ export function AdminSidebar() {
     openSections,
     setOpenSections,
   ] = useState<Record<string, boolean>>({
+    Health: pathname.startsWith(
+      "/admin/health",
+    ),
     HSAKAA: pathname.startsWith(
       "/admin/hsakaa",
     ),

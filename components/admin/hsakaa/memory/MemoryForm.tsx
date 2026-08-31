@@ -1,15 +1,8 @@
 "use client";
 
+import { useMemo, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import {
-  useMemo,
-  useState,
-  type FormEvent,
-} from "react";
-import {
-  useRouter,
-} from "next/navigation";
-import {
-  Brain,
   CalendarDays,
   CircleAlert,
   Globe2,
@@ -20,11 +13,17 @@ import {
 
 import { AdminFormFooter } from "@/components/admin/AdminFormFooter";
 import {
-  createMemory,
-  updateMemory,
-} from "@/lib/api/memory";
+  MEMORY_TYPE_OPTIONS,
+  getMemoryTypeDescription,
+  getMemoryTypeLabel,
+  isLegacyMemoryType,
+} from "@/lib/memory-types";
+import { createMemory, updateMemory } from "@/lib/api/memory";
 import {
   MemoryAccessLevel,
+  MemoryDurability,
+  MemoryPersonRelation,
+  MemoryScope,
   MemorySensitivity,
   MemorySource,
   MemoryType,
@@ -40,12 +39,13 @@ type MemoryFormProps = {
   mode?: MemoryFormMode;
   initialData?: Memory | null;
   people?: MemoryPerson[];
-  // ownerUserId?: string;
 };
 
 type MemoryFormState = {
   content: string;
+  scope: MemoryScope;
   personId: string;
+  groupPersonIds: string[];
 
   type: MemoryType;
   source: MemorySource;
@@ -54,10 +54,13 @@ type MemoryFormState = {
   verificationStatus: MemoryVerificationStatus;
 
   tags: string[];
+  categoriesText: string;
 
   importance: number;
   confidence: number;
 
+  durability: MemoryDurability;
+  happenedAt: string;
   expiresAt: string;
 
   sourceReference: {
@@ -67,17 +70,23 @@ type MemoryFormState = {
     sourceUrl: string;
     sourceCreatedAt: string;
   };
-
-  isActive: boolean;
-  isArchived: boolean;
 };
 
 function formatEnum(value: string) {
   return value
     .replaceAll("_", " ")
-    .replace(/\b\w/g, (character) =>
-      character.toUpperCase(),
-    );
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function splitLabels(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 function toDateTimeLocal(value?: string) {
@@ -91,81 +100,82 @@ function toDateTimeLocal(value?: string) {
     return "";
   }
 
-  const timezoneOffset =
-    date.getTimezoneOffset() * 60_000;
+  const timezoneOffset = date.getTimezoneOffset() * 60_000;
 
-  return new Date(
-    date.getTime() - timezoneOffset,
-  )
-    .toISOString()
-    .slice(0, 16);
+  return new Date(date.getTime() - timezoneOffset).toISOString().slice(0, 16);
 }
 
-function getInitialState(
-  initialData?: Memory | null,
-): MemoryFormState {
-  const sourceReference =
-    initialData?.sourceReference;
+function getInitialState(initialData?: Memory | null): MemoryFormState {
+  const sourceReference = initialData?.sourceReference;
 
   return {
     content: initialData?.content ?? "",
 
+    scope:
+      initialData?.scope ??
+      (initialData?.personId ? MemoryScope.INDIVIDUAL : MemoryScope.GENERAL),
+
     personId:
       typeof initialData?.personId === "string"
         ? initialData.personId
-        : initialData?.personId?._id ?? "",
+        : (initialData?.personId?._id ??
+          (() => {
+            const primaryLink = initialData?.personLinks?.find(
+              (link) => link.relation === MemoryPersonRelation.PRIMARY_SUBJECT,
+            );
 
-    type:
-      initialData?.type ??
-      MemoryType.FACT,
+            if (!primaryLink) {
+              return "";
+            }
 
-    source:
-      initialData?.source ??
-      MemorySource.MANUAL,
+            return typeof primaryLink.personId === "string"
+              ? primaryLink.personId
+              : primaryLink.personId._id;
+          })()),
 
-    accessLevel:
-      initialData?.accessLevel ??
-      MemoryAccessLevel.OWNER_ONLY,
+    groupPersonIds:
+      initialData?.personLinks
+        ?.filter((link) =>
+          [
+            MemoryPersonRelation.PRIMARY_SUBJECT,
+            MemoryPersonRelation.PARTICIPANT,
+          ].includes(link.relation),
+        )
+        .map((link) =>
+          typeof link.personId === "string" ? link.personId : link.personId._id,
+        ) ?? [],
 
-    sensitivity:
-      initialData?.sensitivity ??
-      MemorySensitivity.PERSONAL,
+    type: initialData?.type ?? MemoryType.FACT,
+
+    source: initialData?.source ?? MemorySource.MANUAL,
+
+    accessLevel: initialData?.accessLevel ?? MemoryAccessLevel.OWNER_ONLY,
+
+    sensitivity: initialData?.sensitivity ?? MemorySensitivity.PERSONAL,
 
     verificationStatus:
-      initialData?.verificationStatus ??
-      MemoryVerificationStatus.CONFIRMED,
+      initialData?.verificationStatus ?? MemoryVerificationStatus.CONFIRMED,
 
     tags: initialData?.tags ?? [],
+    categoriesText: (initialData?.categories ?? []).join(", "),
 
-    importance:
-      initialData?.importance ?? 0.5,
+    importance: initialData?.importance ?? 0.5,
 
-    confidence:
-      initialData?.confidence ?? 0.5,
+    confidence: initialData?.confidence ?? 0.5,
 
-    expiresAt: toDateTimeLocal(
-      initialData?.expiresAt,
-    ),
+    durability: initialData?.durability ?? MemoryDurability.DURABLE,
+
+    happenedAt: toDateTimeLocal(initialData?.happenedAt),
+
+    expiresAt: toDateTimeLocal(initialData?.expiresAt),
 
     sourceReference: {
-      entityId:
-        sourceReference?.entityId ?? "",
-      entityType:
-        sourceReference?.entityType ?? "",
-      externalId:
-        sourceReference?.externalId ?? "",
-      sourceUrl:
-        sourceReference?.sourceUrl ?? "",
-      sourceCreatedAt: toDateTimeLocal(
-        sourceReference?.sourceCreatedAt,
-      ),
+      entityId: sourceReference?.entityId ?? "",
+      entityType: sourceReference?.entityType ?? "",
+      externalId: sourceReference?.externalId ?? "",
+      sourceUrl: sourceReference?.sourceUrl ?? "",
+      sourceCreatedAt: toDateTimeLocal(sourceReference?.sourceCreatedAt),
     },
-
-    isActive:
-      initialData?.isActive ?? true,
-
-    isArchived:
-      initialData?.isArchived ?? false,
   };
 }
 
@@ -181,9 +191,7 @@ function FieldLabel({
       {children}
 
       {optional ? (
-        <span className="ml-2 text-xs font-medium text-white/25">
-          Optional
-        </span>
+        <span className="ml-2 text-xs font-medium text-white/25">Optional</span>
       ) : null}
     </label>
   );
@@ -231,51 +239,35 @@ export function MemoryForm({
   mode = "create",
   initialData,
   people = [],
-  // ownerUserId,
 }: MemoryFormProps) {
   const router = useRouter();
 
-  const [form, setForm] =
-    useState<MemoryFormState>(() =>
-      getInitialState(initialData),
-    );
+  const [form, setForm] = useState<MemoryFormState>(() =>
+    getInitialState(initialData),
+  );
 
-  const [tagInput, setTagInput] =
-    useState("");
+  const [tagInput, setTagInput] = useState("");
 
-  const [showAdvanced, setShowAdvanced] =
-    useState(
-      Boolean(
-        initialData?.sourceReference ||
-          initialData?.expiresAt,
-      ),
-    );
+  const [showAdvanced, setShowAdvanced] = useState(
+    Boolean(initialData?.sourceReference || initialData?.expiresAt),
+  );
 
-  const [isSubmitting, setIsSubmitting] =
-    useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [error, setError] = useState("");
 
   const isEditMode = mode === "edit";
 
   const selectedPerson = useMemo(
-    () =>
-      people.find(
-        (person) =>
-          person._id === form.personId,
-      ),
+    () => people.find((person) => person._id === form.personId),
     [form.personId, people],
   );
 
   const requiresPerson =
-    form.accessLevel ===
-      MemoryAccessLevel.PERSON_PRIVATE ||
-    form.accessLevel ===
-      MemoryAccessLevel.OWNER_AND_PERSON;
+    form.accessLevel === MemoryAccessLevel.PERSON_PRIVATE ||
+    form.accessLevel === MemoryAccessLevel.OWNER_AND_PERSON;
 
-  function updateField<
-    Key extends keyof MemoryFormState,
-  >(
+  function updateField<Key extends keyof MemoryFormState>(
     key: Key,
     value: MemoryFormState[Key],
   ) {
@@ -299,9 +291,7 @@ export function MemoryForm({
   }
 
   function addTag() {
-    const normalizedTag = tagInput
-      .trim()
-      .replace(/^#/, "");
+    const normalizedTag = tagInput.trim().replace(/^#/, "");
 
     if (!normalizedTag) {
       return;
@@ -310,9 +300,7 @@ export function MemoryForm({
     setForm((current) => {
       if (
         current.tags.some(
-          (tag) =>
-            tag.toLowerCase() ===
-            normalizedTag.toLowerCase(),
+          (tag) => tag.toLowerCase() === normalizedTag.toLowerCase(),
         )
       ) {
         return current;
@@ -320,10 +308,7 @@ export function MemoryForm({
 
       return {
         ...current,
-        tags: [
-          ...current.tags,
-          normalizedTag,
-        ],
+        tags: [...current.tags, normalizedTag],
       };
     });
 
@@ -333,19 +318,12 @@ export function MemoryForm({
   function removeTag(tagToRemove: string) {
     setForm((current) => ({
       ...current,
-      tags: current.tags.filter(
-        (tag) => tag !== tagToRemove,
-      ),
+      tags: current.tags.filter((tag) => tag !== tagToRemove),
     }));
   }
 
-  function handleTagKeyDown(
-    event: React.KeyboardEvent<HTMLInputElement>,
-  ) {
-    if (
-      event.key === "Enter" ||
-      event.key === ","
-    ) {
+  function handleTagKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Enter" || event.key === ",") {
       event.preventDefault();
       addTag();
     }
@@ -356,40 +334,36 @@ export function MemoryForm({
       return "Memory content is required.";
     }
 
-    if (
-      requiresPerson &&
-      !form.personId
-    ) {
+    if (form.scope === MemoryScope.INDIVIDUAL && !form.personId) {
+      return "Select the person this memory is about.";
+    }
+
+    if (form.scope === MemoryScope.GROUP && form.groupPersonIds.length < 2) {
+      return "Select at least two people for a group memory.";
+    }
+
+    if (requiresPerson && form.scope !== MemoryScope.INDIVIDUAL) {
+      return "Person-visible access levels are only available for an individual memory.";
+    }
+
+    if (requiresPerson && !form.personId) {
       return "Select a person for this access level.";
     }
 
-    if (
-      form.importance < 0 ||
-      form.importance > 1
-    ) {
+    if (form.importance < 0 || form.importance > 1) {
       return "Importance must be between 0 and 1.";
     }
 
-    if (
-      form.confidence < 0 ||
-      form.confidence > 1
-    ) {
+    if (form.confidence < 0 || form.confidence > 1) {
       return "Confidence must be between 0 and 1.";
     }
 
     return "";
   }
 
-  function buildSourceReference():
-    | MemorySourceReference
-    | undefined {
-    const {
-      entityId,
-      entityType,
-      externalId,
-      sourceUrl,
-      sourceCreatedAt,
-    } = form.sourceReference;
+  function buildSourceReference(): MemorySourceReference | undefined {
+    const { entityId, entityType, externalId, sourceUrl, sourceCreatedAt } =
+      form.sourceReference;
 
     const hasReference = [
       entityId,
@@ -404,29 +378,20 @@ export function MemoryForm({
     }
 
     return {
-      entityId:
-        entityId.trim() || undefined,
-      entityType:
-        entityType.trim() || undefined,
-      externalId:
-        externalId.trim() || undefined,
-      sourceUrl:
-        sourceUrl.trim() || undefined,
+      entityId: entityId.trim() || undefined,
+      entityType: entityType.trim() || undefined,
+      externalId: externalId.trim() || undefined,
+      sourceUrl: sourceUrl.trim() || undefined,
       sourceCreatedAt: sourceCreatedAt
-        ? new Date(
-            sourceCreatedAt,
-          ).toISOString()
+        ? new Date(sourceCreatedAt).toISOString()
         : undefined,
     };
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const validationError =
-      validateForm();
+    const validationError = validateForm();
 
     if (validationError) {
       setError(validationError);
@@ -436,62 +401,82 @@ export function MemoryForm({
     setIsSubmitting(true);
     setError("");
 
-    const payload = {
-      // ownerUserId:
-      //   ownerUserId || undefined,
+    const subjectPersonLinks =
+      form.scope === MemoryScope.INDIVIDUAL
+        ? [
+            {
+              personId: form.personId,
+              relation: MemoryPersonRelation.PRIMARY_SUBJECT,
+            },
+          ]
+        : form.scope === MemoryScope.GROUP
+          ? form.groupPersonIds.map((personId) => ({
+              personId,
+              relation: MemoryPersonRelation.PARTICIPANT,
+            }))
+          : [];
 
-      personId:
-        form.personId || null,
+    // Editing the subject/scope must not erase attribution such as
+    // "mentioned", "source" or "related" person links that were
+    // captured earlier. Those relationships are separate from ownership.
+    const contextualPersonLinks =
+      initialData?.personLinks
+        ?.filter(
+          (link) =>
+            link.relation !== MemoryPersonRelation.PRIMARY_SUBJECT &&
+            link.relation !== MemoryPersonRelation.PARTICIPANT,
+        )
+        .map((link) => ({
+          personId:
+            typeof link.personId === "string"
+              ? link.personId
+              : link.personId._id,
+          relation: link.relation,
+        })) ?? [];
+
+    const personLinks = [...subjectPersonLinks, ...contextualPersonLinks];
+
+    const payload = {
+      scope: form.scope,
+      personId: form.scope === MemoryScope.INDIVIDUAL ? form.personId : null,
+      personLinks,
 
       content: form.content.trim(),
 
       type: form.type,
       source: form.source,
 
-      sourceReference:
-        buildSourceReference(),
+      sourceReference: buildSourceReference(),
 
       tags: form.tags,
+      categories: splitLabels(form.categoriesText),
 
       importance: form.importance,
       confidence: form.confidence,
 
-      verificationStatus:
-        form.verificationStatus,
+      verificationStatus: form.verificationStatus,
 
-      accessLevel:
-        form.accessLevel,
+      accessLevel: form.accessLevel,
 
-      sensitivity:
-        form.sensitivity,
+      sensitivity: form.sensitivity,
 
-      expiresAt: form.expiresAt
-        ? new Date(
-            form.expiresAt,
-          ).toISOString()
-        : null,
+      durability: form.durability,
 
-      isActive: form.isActive,
-      isArchived: form.isArchived,
+      happenedAt: form.happenedAt
+        ? new Date(form.happenedAt).toISOString()
+        : undefined,
+
+      expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
     };
 
     try {
-      if (
-        isEditMode &&
-        initialData?._id
-      ) {
-        await updateMemory(
-          initialData._id,
-          payload,
-          // ownerUserId,
-        );
+      if (isEditMode && initialData?._id) {
+        await updateMemory(initialData._id, payload);
       } else {
         await createMemory(payload);
       }
 
-      router.push(
-        "/admin/hsakaa/memory",
-      );
+      router.push("/admin/hsakaa/memory");
 
       router.refresh();
     } catch (caughtError) {
@@ -508,18 +493,13 @@ export function MemoryForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="space-y-8"
-    >
+    <form onSubmit={handleSubmit} className="space-y-8">
       {error ? (
         <section className="rounded-[20px] border border-red-400/20 bg-red-400/[0.06] p-4">
           <div className="flex items-start gap-3">
             <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
 
-            <p className="text-sm leading-6 text-red-100">
-              {error}
-            </p>
+            <p className="text-sm leading-6 text-red-100">{error}</p>
           </div>
         </section>
       ) : null}
@@ -529,18 +509,11 @@ export function MemoryForm({
         title="What should HSAKAA remember?"
         description="Write one clear, atomic memory. Each memory should represent one fact, preference, decision, routine, goal, experience, relationship or project."
       >
-        <FieldLabel>
-          Memory content
-        </FieldLabel>
+        <FieldLabel>Memory content</FieldLabel>
 
         <textarea
           value={form.content}
-          onChange={(event) =>
-            updateField(
-              "content",
-              event.target.value,
-            )
-          }
+          onChange={(event) => updateField("content", event.target.value)}
           rows={7}
           required
           placeholder="Example: Aakash prefers soy milk because he is lactose intolerant."
@@ -548,129 +521,170 @@ export function MemoryForm({
         />
 
         <div className="mt-4 flex items-center justify-between gap-4 text-xs text-white/25">
-          <span>
-            Keep memories specific and easy to
-            retrieve.
-          </span>
+          <span>Keep memories specific and easy to retrieve.</span>
 
-          <span>
-            {form.content.length} characters
-          </span>
+          <span>{form.content.length} characters</span>
         </div>
       </FormSection>
 
       <FormSection
         eyebrow="Context"
-        title="Who is this memory about?"
-        description="Global memories shape HSAKAA for every visitor. Person memories become available after the related person verifies their identity."
+        title="Who owns this memory context?"
+        description="Identity attribution is explicit: general context belongs to nobody, individual context belongs to one saved person, and group context belongs to the selected participants together."
       >
         <div className="grid gap-5 lg:grid-cols-2">
           <div>
-            <FieldLabel optional>
-              Person
-            </FieldLabel>
+            <FieldLabel>Memory scope</FieldLabel>
 
-            <div className="relative">
-              {form.personId ? (
-                <UserRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C6FF32]" />
-              ) : (
-                <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-              )}
+            <select
+              value={form.scope}
+              onChange={(event) => {
+                const scope = event.target.value as MemoryScope;
+                setForm((current) => ({
+                  ...current,
+                  scope,
+                  ...(scope === MemoryScope.GENERAL
+                    ? { personId: "", groupPersonIds: [] }
+                    : scope === MemoryScope.INDIVIDUAL
+                      ? { groupPersonIds: [] }
+                      : { personId: "" }),
+                  ...((scope === MemoryScope.GENERAL ||
+                    scope === MemoryScope.GROUP) &&
+                  (current.accessLevel === MemoryAccessLevel.PERSON_PRIVATE ||
+                    current.accessLevel === MemoryAccessLevel.OWNER_AND_PERSON)
+                    ? { accessLevel: MemoryAccessLevel.OWNER_ONLY }
+                    : {}),
+                }));
+              }}
+              className={selectClassName}
+            >
+              <option value={MemoryScope.GENERAL}>
+                General · no person owns this memory
+              </option>
+              <option value={MemoryScope.INDIVIDUAL}>
+                Individual · one primary person
+              </option>
+              <option value={MemoryScope.GROUP}>
+                Group · multiple people together
+              </option>
+            </select>
 
-              <select
-                value={form.personId}
-                onChange={(event) =>
-                  updateField(
-                    "personId",
-                    event.target.value,
-                  )
-                }
-                className={`${selectClassName} pl-11`}
-              >
-                <option value="">
-                  Global memory
-                </option>
-
-                {people.map((person) => (
-                  <option
-                    key={person._id}
-                    value={person._id}
+            {form.scope === MemoryScope.INDIVIDUAL ? (
+              <div className="mt-4">
+                <FieldLabel>Primary person</FieldLabel>
+                <div className="relative">
+                  <UserRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#C6FF32]" />
+                  <select
+                    value={form.personId}
+                    onChange={(event) =>
+                      updateField("personId", event.target.value)
+                    }
+                    className={`${selectClassName} pl-11`}
                   >
-                    {person.preferredName ??
-                      person.name}
-                    {" — "}
-                    {formatEnum(
-                      person.relationship,
-                    )}
-                  </option>
-                ))}
-              </select>
-            </div>
+                    <option value="">Select saved person</option>
+                    {people.map((person) => (
+                      <option key={person._id} value={person._id}>
+                        {person.preferredName ?? person.name} —{" "}
+                        {formatEnum(person.relationship)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedPerson ? (
+                  <p className="mt-2 text-xs text-white/35">
+                    This becomes authoritative individual memory for{" "}
+                    <span className="font-bold text-white/60">
+                      {selectedPerson.preferredName ?? selectedPerson.name}
+                    </span>
+                    .
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
 
-            {selectedPerson ? (
-              <p className="mt-2 text-xs text-white/35">
-                Linked to{" "}
-                <span className="font-bold text-white/60">
-                  {selectedPerson.name}
-                </span>
-                .
+            {form.scope === MemoryScope.GROUP ? (
+              <div className="mt-4">
+                <FieldLabel>Group participants</FieldLabel>
+                <div className="flex max-h-44 flex-wrap gap-2 overflow-y-auto rounded-[16px] border border-white/10 bg-[#030608] p-3">
+                  {people.map((person) => {
+                    const selected = form.groupPersonIds.includes(person._id);
+                    return (
+                      <button
+                        key={person._id}
+                        type="button"
+                        onClick={() =>
+                          updateField(
+                            "groupPersonIds",
+                            selected
+                              ? form.groupPersonIds.filter(
+                                  (id) => id !== person._id,
+                                )
+                              : [...form.groupPersonIds, person._id],
+                          )
+                        }
+                        className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                          selected
+                            ? "border-[#C6FF32]/40 bg-[#C6FF32]/10 text-[#C6FF32]"
+                            : "border-white/10 text-white/45"
+                        }`}
+                      >
+                        {person.preferredName ?? person.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-2 text-xs text-white/35">
+                  Group facts stay shared context. HSAKAA must not turn a joint
+                  statement into an individual preference or belief.
+                </p>
+              </div>
+            ) : null}
+
+            {form.scope === MemoryScope.GENERAL ? (
+              <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-white/35">
+                <Globe2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                General memories can still reference people as mentions or
+                sources through the API, but they are never treated as that
+                person&apos;s own memory.
               </p>
-            ) : (
-              <p className="mt-2 text-xs text-white/35">
-                Available as general HSAKAA
-                context based on its access level.
-              </p>
-            )}
+            ) : null}
           </div>
 
           <div>
-            <FieldLabel>
-              Access level
-            </FieldLabel>
+            <FieldLabel>Access level</FieldLabel>
 
             <select
               value={form.accessLevel}
               onChange={(event) =>
                 updateField(
                   "accessLevel",
-                  event.target
-                    .value as MemoryAccessLevel,
+                  event.target.value as MemoryAccessLevel,
                 )
               }
               className={selectClassName}
             >
-              {Object.values(
-                MemoryAccessLevel,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemoryAccessLevel).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
             </select>
 
             <p className="mt-2 text-xs leading-5 text-white/35">
-              {form.accessLevel ===
-              MemoryAccessLevel.OWNER_ONLY
+              {form.accessLevel === MemoryAccessLevel.OWNER_ONLY
                 ? "Only the owner-side HSAKAA system can use this memory."
-                : form.accessLevel ===
-                    MemoryAccessLevel.PUBLIC
+                : form.accessLevel === MemoryAccessLevel.PUBLIC
                   ? "This memory may be used while talking with any visitor."
-                  : form.accessLevel ===
-                      MemoryAccessLevel.OWNER_AND_PERSON
+                  : form.accessLevel === MemoryAccessLevel.OWNER_AND_PERSON
                     ? "Both Aakash and the verified linked person may use this memory."
                     : "This memory is intended only for the verified linked person."}
             </p>
           </div>
         </div>
 
-        {requiresPerson &&
-        !form.personId ? (
+        {requiresPerson && !form.personId ? (
           <div className="mt-5 rounded-[16px] border border-amber-300/20 bg-amber-300/[0.06] px-4 py-3 text-sm text-amber-100">
-            This access level requires a linked
-            person.
+            This access level requires a linked person.
           </div>
         ) : null}
       </FormSection>
@@ -682,57 +696,53 @@ export function MemoryForm({
       >
         <div className="grid gap-5 md:grid-cols-2">
           <div>
-            <FieldLabel>
-              Memory type
-            </FieldLabel>
+            <FieldLabel>Memory type</FieldLabel>
 
             <select
               value={form.type}
               onChange={(event) =>
-                updateField(
-                  "type",
-                  event.target
-                    .value as MemoryType,
-                )
+                updateField("type", event.target.value as MemoryType)
               }
               className={selectClassName}
             >
-              {Object.values(
-                MemoryType,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
-                  {formatEnum(value)}
+              {isLegacyMemoryType(form.type) ? (
+                <option value={form.type}>
+                  {getMemoryTypeLabel(form.type)}
+                </option>
+              ) : null}
+
+              {MEMORY_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </select>
+
+            <p className="mt-2 text-xs leading-5 text-white/35">
+              {getMemoryTypeDescription(form.type)}
+            </p>
+
+            {isLegacyMemoryType(form.type) ? (
+              <p className="mt-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] px-3 py-2 text-xs leading-5 text-amber-100/75">
+                This is a legacy memory type. It remains readable for history,
+                but saving a more precise canonical type is recommended when the
+                meaning is clear.
+              </p>
+            ) : null}
           </div>
 
           <div>
-            <FieldLabel>
-              Source
-            </FieldLabel>
+            <FieldLabel>Source</FieldLabel>
 
             <select
               value={form.source}
               onChange={(event) =>
-                updateField(
-                  "source",
-                  event.target
-                    .value as MemorySource,
-                )
+                updateField("source", event.target.value as MemorySource)
               }
               className={selectClassName}
             >
-              {Object.values(
-                MemorySource,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemorySource).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
@@ -740,30 +750,20 @@ export function MemoryForm({
           </div>
 
           <div>
-            <FieldLabel>
-              Verification status
-            </FieldLabel>
+            <FieldLabel>Verification status</FieldLabel>
 
             <select
-              value={
-                form.verificationStatus
-              }
+              value={form.verificationStatus}
               onChange={(event) =>
                 updateField(
                   "verificationStatus",
-                  event.target
-                    .value as MemoryVerificationStatus,
+                  event.target.value as MemoryVerificationStatus,
                 )
               }
               className={selectClassName}
             >
-              {Object.values(
-                MemoryVerificationStatus,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemoryVerificationStatus).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
@@ -771,28 +771,20 @@ export function MemoryForm({
           </div>
 
           <div>
-            <FieldLabel>
-              Sensitivity
-            </FieldLabel>
+            <FieldLabel>Sensitivity</FieldLabel>
 
             <select
               value={form.sensitivity}
               onChange={(event) =>
                 updateField(
                   "sensitivity",
-                  event.target
-                    .value as MemorySensitivity,
+                  event.target.value as MemorySensitivity,
                 )
               }
               className={selectClassName}
             >
-              {Object.values(
-                MemorySensitivity,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemorySensitivity).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
@@ -809,15 +801,10 @@ export function MemoryForm({
         <div className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-[20px] border border-white/10 bg-black/10 p-4">
             <div className="flex items-center justify-between gap-4">
-              <FieldLabel>
-                Importance
-              </FieldLabel>
+              <FieldLabel>Importance</FieldLabel>
 
               <span className="text-sm font-black text-[#C6FF32]">
-                {Math.round(
-                  form.importance * 100,
-                )}
-                %
+                {Math.round(form.importance * 100)}%
               </span>
             </div>
 
@@ -828,12 +815,7 @@ export function MemoryForm({
               step="0.05"
               value={form.importance}
               onChange={(event) =>
-                updateField(
-                  "importance",
-                  Number(
-                    event.target.value,
-                  ),
-                )
+                updateField("importance", Number(event.target.value))
               }
               className="mt-3 w-full accent-[#C6FF32]"
             />
@@ -846,15 +828,10 @@ export function MemoryForm({
 
           <div className="rounded-[20px] border border-white/10 bg-black/10 p-4">
             <div className="flex items-center justify-between gap-4">
-              <FieldLabel>
-                Confidence
-              </FieldLabel>
+              <FieldLabel>Confidence</FieldLabel>
 
               <span className="text-sm font-black text-[#C6FF32]">
-                {Math.round(
-                  form.confidence * 100,
-                )}
-                %
+                {Math.round(form.confidence * 100)}%
               </span>
             </div>
 
@@ -865,12 +842,7 @@ export function MemoryForm({
               step="0.05"
               value={form.confidence}
               onChange={(event) =>
-                updateField(
-                  "confidence",
-                  Number(
-                    event.target.value,
-                  ),
-                )
+                updateField("confidence", Number(event.target.value))
               }
               className="mt-3 w-full accent-[#C6FF32]"
             />
@@ -885,17 +857,13 @@ export function MemoryForm({
 
       <FormSection
         eyebrow="Search"
-        title="Tags"
-        description="Add keywords that help organize the memory and improve keyword-based retrieval."
+        title="Tags and categories"
+        description="Keep the same retrieval metadata that was captured in the Memory Inbox, so editing an active memory does not drop its organization context."
       >
         <div className="flex flex-col gap-3 sm:flex-row">
           <input
             value={tagInput}
-            onChange={(event) =>
-              setTagInput(
-                event.target.value,
-              )
-            }
+            onChange={(event) => setTagInput(event.target.value)}
             onKeyDown={handleTagKeyDown}
             placeholder="Enter a tag and press Enter"
             className={inputClassName}
@@ -919,12 +887,9 @@ export function MemoryForm({
                 className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white/60"
               >
                 #{tag}
-
                 <button
                   type="button"
-                  onClick={() =>
-                    removeTag(tag)
-                  }
+                  onClick={() => removeTag(tag)}
                   aria-label={`Remove ${tag}`}
                   className="text-white/25 transition hover:text-red-300"
                 >
@@ -934,20 +899,30 @@ export function MemoryForm({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-sm text-white/30">
-            No tags added.
-          </p>
+          <p className="mt-3 text-sm text-white/30">No tags added.</p>
         )}
+
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <FieldLabel optional>Categories</FieldLabel>
+          <input
+            value={form.categoriesText}
+            onChange={(event) =>
+              updateField("categoriesText", event.target.value)
+            }
+            placeholder="work, family, learning"
+            className={inputClassName}
+          />
+          <p className="mt-2 text-xs leading-5 text-white/35">
+            Separate categories with commas. Existing entity references are
+            preserved automatically when you save.
+          </p>
+        </div>
       </FormSection>
 
       <section className="rounded-[24px] border border-white/10 bg-white/[0.025]">
         <button
           type="button"
-          onClick={() =>
-            setShowAdvanced(
-              (current) => !current,
-            )
-          }
+          onClick={() => setShowAdvanced((current) => !current)}
           className="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6"
         >
           <div>
@@ -956,13 +931,12 @@ export function MemoryForm({
             </p>
 
             <h2 className="mt-2 text-xl font-black tracking-[-0.03em] text-white">
-              Source reference and lifecycle
+              Timeline, durability and source
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-white/40">
-              Add source identifiers, expiration
-              and record-state settings when
-              required.
+              Keep happened-at timing, temporary/durable lifecycle and source
+              provenance aligned with the Memory Inbox record.
             </p>
           </div>
 
@@ -975,20 +949,51 @@ export function MemoryForm({
           <div className="border-t border-white/10 p-5 sm:p-6">
             <div className="grid gap-5 md:grid-cols-2">
               <div>
-                <FieldLabel optional>
-                  Entity ID
-                </FieldLabel>
+                <FieldLabel>Durability</FieldLabel>
+                <select
+                  value={form.durability}
+                  onChange={(event) => {
+                    const durability = event.target.value as MemoryDurability;
+                    setForm((current) => ({
+                      ...current,
+                      durability,
+                      ...(durability === MemoryDurability.DURABLE
+                        ? { expiresAt: "" }
+                        : {}),
+                    }));
+                  }}
+                  className={selectClassName}
+                >
+                  {Object.values(MemoryDurability).map((value) => (
+                    <option key={value} value={value}>
+                      {formatEnum(value)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <FieldLabel optional>Happened at</FieldLabel>
+                <div className="relative">
+                  <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <input
+                    type="datetime-local"
+                    value={form.happenedAt}
+                    onChange={(event) =>
+                      updateField("happenedAt", event.target.value)
+                    }
+                    className={`${inputClassName} pl-11`}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <FieldLabel optional>Entity ID</FieldLabel>
 
                 <input
-                  value={
-                    form.sourceReference
-                      .entityId
-                  }
+                  value={form.sourceReference.entityId}
                   onChange={(event) =>
-                    updateSourceReference(
-                      "entityId",
-                      event.target.value,
-                    )
+                    updateSourceReference("entityId", event.target.value)
                   }
                   placeholder="MongoDB ObjectId"
                   className={inputClassName}
@@ -996,20 +1001,12 @@ export function MemoryForm({
               </div>
 
               <div>
-                <FieldLabel optional>
-                  Entity type
-                </FieldLabel>
+                <FieldLabel optional>Entity type</FieldLabel>
 
                 <input
-                  value={
-                    form.sourceReference
-                      .entityType
-                  }
+                  value={form.sourceReference.entityType}
                   onChange={(event) =>
-                    updateSourceReference(
-                      "entityType",
-                      event.target.value,
-                    )
+                    updateSourceReference("entityType", event.target.value)
                   }
                   placeholder="journal_entry"
                   className={inputClassName}
@@ -1017,20 +1014,12 @@ export function MemoryForm({
               </div>
 
               <div>
-                <FieldLabel optional>
-                  External ID
-                </FieldLabel>
+                <FieldLabel optional>External ID</FieldLabel>
 
                 <input
-                  value={
-                    form.sourceReference
-                      .externalId
-                  }
+                  value={form.sourceReference.externalId}
                   onChange={(event) =>
-                    updateSourceReference(
-                      "externalId",
-                      event.target.value,
-                    )
+                    updateSourceReference("externalId", event.target.value)
                   }
                   placeholder="External reference"
                   className={inputClassName}
@@ -1038,21 +1027,13 @@ export function MemoryForm({
               </div>
 
               <div>
-                <FieldLabel optional>
-                  Source URL
-                </FieldLabel>
+                <FieldLabel optional>Source URL</FieldLabel>
 
                 <input
                   type="url"
-                  value={
-                    form.sourceReference
-                      .sourceUrl
-                  }
+                  value={form.sourceReference.sourceUrl}
                   onChange={(event) =>
-                    updateSourceReference(
-                      "sourceUrl",
-                      event.target.value,
-                    )
+                    updateSourceReference("sourceUrl", event.target.value)
                   }
                   placeholder="https://..."
                   className={inputClassName}
@@ -1060,19 +1041,14 @@ export function MemoryForm({
               </div>
 
               <div>
-                <FieldLabel optional>
-                  Source created at
-                </FieldLabel>
+                <FieldLabel optional>Source created at</FieldLabel>
 
                 <div className="relative">
                   <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
 
                   <input
                     type="datetime-local"
-                    value={
-                      form.sourceReference
-                        .sourceCreatedAt
-                    }
+                    value={form.sourceReference.sourceCreatedAt}
                     onChange={(event) =>
                       updateSourceReference(
                         "sourceCreatedAt",
@@ -1085,9 +1061,7 @@ export function MemoryForm({
               </div>
 
               <div>
-                <FieldLabel optional>
-                  Memory expires at
-                </FieldLabel>
+                <FieldLabel optional>Temporary memory expires at</FieldLabel>
 
                 <div className="relative">
                   <CalendarDays className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
@@ -1095,76 +1069,50 @@ export function MemoryForm({
                   <input
                     type="datetime-local"
                     value={form.expiresAt}
+                    disabled={form.durability === MemoryDurability.DURABLE}
                     onChange={(event) =>
-                      updateField(
-                        "expiresAt",
-                        event.target.value,
-                      )
+                      updateField("expiresAt", event.target.value)
                     }
-                    className={`${inputClassName} pl-11`}
+                    className={`${inputClassName} pl-11 disabled:cursor-not-allowed disabled:opacity-40`}
                   />
                 </div>
 
                 <p className="mt-2 text-xs leading-5 text-amber-100/50">
-                  Your MongoDB TTL index permanently
-                  removes the document after this
-                  date.
+                  Only temporary memories should expire. Durable memories keep
+                  this field empty.
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-white/10 bg-black/10 p-4">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) =>
-                    updateField(
-                      "isActive",
-                      event.target.checked,
-                    )
-                  }
-                  className="mt-1 h-4 w-4 accent-[#C6FF32]"
-                />
-
-                <span>
-                  <span className="block text-sm font-bold text-white">
-                    Active memory
-                  </span>
-
-                  <span className="mt-1 block text-xs leading-5 text-white/35">
-                    Active memories may be used by
-                    HSAKAA retrieval.
-                  </span>
-                </span>
-              </label>
-
-              <label className="flex cursor-pointer items-start gap-3 rounded-[18px] border border-white/10 bg-black/10 p-4">
-                <input
-                  type="checkbox"
-                  checked={form.isArchived}
-                  onChange={(event) =>
-                    updateField(
-                      "isArchived",
-                      event.target.checked,
-                    )
-                  }
-                  className="mt-1 h-4 w-4 accent-[#C6FF32]"
-                />
-
-                <span>
-                  <span className="block text-sm font-bold text-white">
-                    Archived
-                  </span>
-
-                  <span className="mt-1 block text-xs leading-5 text-white/35">
-                    Keep the memory in the database
-                    without showing it among active
-                    memories.
-                  </span>
-                </span>
-              </label>
-            </div>
+            {initialData ? (
+              <div className="mt-6 rounded-[18px] border border-white/10 bg-black/10 p-4">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                  Capture provenance · read only
+                </p>
+                <div className="mt-3 grid gap-3 text-xs text-white/45 sm:grid-cols-3">
+                  <div>
+                    <span className="block text-white/25">Origin</span>
+                    <span className="mt-1 block font-bold text-white/60">
+                      {formatEnum(initialData.captureOrigin)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-white/25">Captured at</span>
+                    <span className="mt-1 block font-bold text-white/60">
+                      {initialData.capturedAt
+                        ? new Date(initialData.capturedAt).toLocaleString()
+                        : "Not recorded"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-white/25">Inbox source</span>
+                    <span className="mt-1 block break-all font-bold text-white/60">
+                      {initialData.inboxItemId ?? "Direct / legacy"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>

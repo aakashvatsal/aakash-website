@@ -30,10 +30,10 @@ const actions = [
     icon: FlaskConical,
   },
   {
-    title: "Verification",
+    title: "People & verification",
     description:
-      "Review identity verification and person access activity.",
-    href: "/admin/hsakaa/verification",
+      "Review people, identity verification and person-specific memory access.",
+    href: "/admin/hsakaa/people",
     icon: ShieldCheck,
   },
 ];

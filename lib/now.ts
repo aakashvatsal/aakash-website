@@ -173,7 +173,7 @@ export async function getNowHistory(
 ): Promise<NowHistoryResponse> {
   const response =
     await fetch(
-      `${API_URL}/now/history?page=${page}&limit=${limit}`,
+      `${API_URL}/now/public/history?page=${page}&limit=${limit}`,
       {
         next: {
           revalidate: 60,

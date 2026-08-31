@@ -4,46 +4,81 @@ import { Pencil } from "lucide-react";
 
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { MemoryPersonDetails } from "@/components/admin/hsakaa/people/MemoryPersonDetails";
+import { PersonConnections } from "@/components/admin/hsakaa/people/PersonConnections";
+import { PersonOpenLoops } from "@/components/admin/hsakaa/people/PersonOpenLoops";
+import { PersonRelationshipContext } from "@/components/admin/hsakaa/people/PersonRelationshipContext";
+import { PersonTimeline } from "@/components/admin/hsakaa/people/PersonTimeline";
 import { getMemories } from "@/lib/api/memory";
-import { getMemoryPerson } from "@/lib/api/memory-people";
+import {
+  getMemoryPeople,
+  getMemoryPerson,
+  getPersonGraph,
+  getPersonOpenLoops,
+  getPersonRelationshipContext,
+  getPersonTimeline,
+} from "@/lib/api/memory-people";
 import type {
   Memory,
   MemoryPerson,
+  PersonGraphDetail,
+  PersonOpenLoopList,
+  PersonRelationshipContext as PersonRelationshipContextData,
+  PersonTimeline as PersonTimelineData,
 } from "@/types/hsakaa";
 
 export const dynamic = "force-dynamic";
 
 type MemoryPersonDetailsPageProps = {
   params: Promise<{
-    personId: string;
+    id: string;
   }>;
 };
 
 export default async function MemoryPersonDetailsPage({
   params,
 }: MemoryPersonDetailsPageProps) {
-  const { personId } = await params;
+  const { id: personId } = await params;
 
   let person: MemoryPerson | null = null;
   let memories: Memory[] = [];
+  let people: MemoryPerson[] = [];
+  let graph: PersonGraphDetail | null = null;
+  let openLoops: PersonOpenLoopList | null = null;
+  let relationshipContext: PersonRelationshipContextData | null = null;
+  let timeline: PersonTimelineData | null = null;
   let error = "";
 
   try {
     const [
       personResponse,
       memoryResponse,
-    ] = await Promise.all([
-      getMemoryPerson(personId),
-
-      getMemories({
-        personId,
-        page: 1,
-        limit: 500,
-      }),
-    ]);
+      peopleResponse,
+      graphResponse,
+      openLoopsResponse,
+      relationshipContextResponse,
+      timelineResponse,
+    ] =
+      await Promise.all([
+        getMemoryPerson(personId),
+        getMemories({
+          subjectPersonId: personId,
+          page: 1,
+          limit: 100,
+        }),
+        getMemoryPeople({ page: 1, limit: 500, isActive: true }),
+        getPersonGraph(personId),
+        getPersonOpenLoops(personId, { limit: 200 }),
+        getPersonRelationshipContext(personId),
+        getPersonTimeline(personId, { limit: 200 }),
+      ]);
 
     person = personResponse;
     memories = memoryResponse.data;
+    people = peopleResponse.data;
+    graph = graphResponse;
+    openLoops = openLoopsResponse;
+    relationshipContext = relationshipContextResponse;
+    timeline = timelineResponse;
   } catch (caughtError) {
     error =
       caughtError instanceof Error
@@ -102,6 +137,42 @@ export default async function MemoryPersonDetailsPage({
         initialPerson={person}
         initialMemories={memories}
       />
+
+      {relationshipContext ? (
+        <PersonRelationshipContext
+          personId={person._id}
+          displayName={displayName}
+          initialContext={relationshipContext}
+          initialPeople={people}
+        />
+      ) : null}
+
+      {graph ? (
+        <PersonConnections
+          personId={person._id}
+          displayName={displayName}
+          initialGraph={graph}
+          initialPeople={people}
+        />
+      ) : null}
+
+      {openLoops ? (
+        <PersonOpenLoops
+          personId={person._id}
+          displayName={displayName}
+          initialOpenLoops={openLoops}
+        />
+      ) : null}
+
+      {timeline ? (
+        <PersonTimeline
+          personId={person._id}
+          displayName={displayName}
+          initialTimeline={timeline}
+          initialPeople={people}
+          initialMemories={memories}
+        />
+      ) : null}
     </main>
   );
 }

@@ -1,16 +1,18 @@
 import Link from "next/link";
 import {
+  Activity,
   ArrowRight,
   Brain,
   CircleAlert,
-  FlaskConical,
   Globe2,
   LockKeyhole,
+  MessageSquareText,
   Plus,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
 
+import { HsakaaDailyBrief } from "@/components/admin/hsakaa/brief/HsakaaDailyBrief";
 import type {
   Memory,
   MemoryPerson,
@@ -251,11 +253,18 @@ export function HsakaaOverview({
       icon: UserRound,
     },
     {
-      title: "Open playground",
+      title: "Intelligence",
       description:
-        "Test HSAKAA responses and memory retrieval.",
-      href: "/admin/hsakaa/playground",
-      icon: FlaskConical,
+        "Inspect conversations, memory traces and embedding health.",
+      href: "/admin/hsakaa/intelligence",
+      icon: Activity,
+    },
+    {
+      title: "Private chat",
+      description:
+        "Talk to HSAKAA with your full Personal OS context.",
+      href: "/admin/hsakaa/chat",
+      icon: MessageSquareText,
     },
   ];
 
@@ -278,6 +287,8 @@ export function HsakaaOverview({
           </div>
         </section>
       ) : null}
+
+      <HsakaaDailyBrief />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {stats.map((stat) => {
@@ -323,7 +334,7 @@ export function HsakaaOverview({
           </h2>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {quickActions.map((action) => {
             const Icon = action.icon;
 

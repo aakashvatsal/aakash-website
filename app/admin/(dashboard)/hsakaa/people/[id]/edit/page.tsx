@@ -9,14 +9,14 @@ export const dynamic = "force-dynamic";
 
 type EditMemoryPersonPageProps = {
   params: Promise<{
-    personId: string;
+    id: string;
   }>;
 };
 
 export default async function EditMemoryPersonPage({
   params,
 }: EditMemoryPersonPageProps) {
-  const { personId } = await params;
+  const { id: personId } = await params;
 
   let person: MemoryPerson | null = null;
   let error = "";

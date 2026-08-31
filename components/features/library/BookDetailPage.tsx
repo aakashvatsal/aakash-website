@@ -78,9 +78,6 @@ export async function BookDetailPage({
       book.summary,
     ) ||
     Boolean(
-      book.notes,
-    ) ||
-    Boolean(
       book.keyTakeaways
         ?.length,
     ) ||
@@ -306,19 +303,6 @@ export async function BookDetailPage({
                       highlights
                     }
                   />
-                </KnowledgeSection>
-              )}
-
-              {book.notes && (
-                <KnowledgeSection
-                  eyebrow="Personal"
-                  title="My notes"
-                >
-                  <div className="max-w-3xl whitespace-pre-line text-lg leading-9 text-white/65">
-                    {
-                      book.notes
-                    }
-                  </div>
                 </KnowledgeSection>
               )}
 

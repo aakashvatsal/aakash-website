@@ -77,7 +77,7 @@ export function HealthSystem({
 
             <p className="mt-8 text-xl leading-9 text-white/55">
               Every company performs better when I
-              perform better. This is today's
+              perform better. This is today’s
               operating snapshot.
             </p>
           </div>

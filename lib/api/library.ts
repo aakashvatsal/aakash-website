@@ -1,3 +1,5 @@
+import { getAdminBackendHeaders } from "@/lib/api/admin-backend-headers";
+
 import type {
   LibraryItem,
   LibraryItemPayload,
@@ -54,25 +56,41 @@ async function parseResponse<T>(
 export async function getLibraryItems(): Promise<
   LibraryItem[]
 > {
-  const response =
-    await fetch(
-      `${API_URL}/library`,
-      {
-        cache: "no-store",
-      },
-    );
+  const limit = 100;
+  const allItems: LibraryItem[] = [];
+  let page = 1;
+  let totalPages = 1;
 
-  const result =
-    await parseResponse<
-      | LibraryListResponse
-      | LibraryItem[]
-    >(response);
+  do {
+    const response =
+      await fetch(
+        `${API_URL}/library?page=${page}&limit=${limit}`,
+        {
+          cache: "no-store",
+          headers: getAdminBackendHeaders(),
+        },
+      );
 
-  return Array.isArray(
-    result,
-  )
-    ? result
-    : result.data;
+    const result =
+      await parseResponse<
+        | LibraryListResponse
+        | LibraryItem[]
+      >(response);
+
+    if (Array.isArray(result)) {
+      allItems.push(...result);
+      break;
+    }
+
+    allItems.push(...result.data);
+
+    totalPages =
+      result.pagination?.totalPages ?? 1;
+
+    page += 1;
+  } while (page <= totalPages);
+
+  return allItems;
 }
 
 export async function getLibraryItem(
@@ -85,6 +103,7 @@ export async function getLibraryItem(
       )}`,
       {
         cache: "no-store",
+        headers: getAdminBackendHeaders(),
       },
     );
 

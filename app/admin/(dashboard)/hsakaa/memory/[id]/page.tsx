@@ -11,20 +11,20 @@ export const dynamic = "force-dynamic";
 
 type MemoryDetailsPageProps = {
   params: Promise<{
-    memoryId: string;
+    id: string;
   }>;
 };
 
 export default async function MemoryDetailsPage({
   params,
 }: MemoryDetailsPageProps) {
-  const { memoryId } = await params;
+  const { id } = await params;
 
   let memory: Memory | null = null;
   let error = "";
 
   try {
-    memory = await getMemory(memoryId);
+    memory = await getMemory(id);
   } catch (caughtError) {
     error =
       caughtError instanceof Error

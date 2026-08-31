@@ -68,7 +68,7 @@ async function parseResponse<T>(
 export async function getHealthDashboard(): Promise<HealthDashboard> {
   const response =
     await fetch(
-      `${API_URL}/health/dashboard`,
+      `${API_URL}/health/public/dashboard`,
       {
         cache: "no-store",
       },
@@ -84,7 +84,7 @@ export async function getHealthTrends(
 ): Promise<HealthTrendsResponse> {
   const response =
     await fetch(
-      `${API_URL}/health/trends?days=${days}`,
+      `${API_URL}/health/public/trends?days=${days}`,
       {
         next: {
           revalidate: 60,

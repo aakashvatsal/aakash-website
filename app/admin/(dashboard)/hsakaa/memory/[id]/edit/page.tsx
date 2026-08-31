@@ -13,14 +13,14 @@ export const dynamic = "force-dynamic";
 
 type EditMemoryPageProps = {
   params: Promise<{
-    memoryId: string;
+    id: string;
   }>;
 };
 
 export default async function EditMemoryPage({
   params,
 }: EditMemoryPageProps) {
-  const { memoryId } = await params;
+  const { id } = await params;
 
   let memory: Memory | null = null;
   let people: MemoryPerson[] = [];
@@ -31,7 +31,7 @@ export default async function EditMemoryPage({
       memoryResponse,
       peopleResponse,
     ] = await Promise.all([
-      getMemory(memoryId),
+      getMemory(id),
 
       getMemoryPeople({
         page: 1,

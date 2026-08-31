@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Archive,
   Brain,
@@ -16,17 +16,24 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { archiveMemory, deleteMemory, restoreMemory } from "@/lib/api/memory";
+
 import {
-  archiveMemory,
-  deleteMemory,
-  restoreMemory,
-} from "@/lib/api/memory";
+  ALL_MEMORY_TYPE_OPTIONS,
+  getMemoryTypeLabel,
+} from "@/lib/memory-types";
+import {
+  getMemoryLifecycleLabel,
+  getMemoryLifecycleStatus,
+  isCurrentMemory,
+} from "@/lib/memory-lifecycle";
 
 import {
   MemoryAccessLevel,
+  MemoryLifecycleStatus,
+  MemoryScope,
   MemorySensitivity,
   MemorySource,
-  MemoryType,
   MemoryVerificationStatus,
   type Memory,
 } from "@/types/hsakaa";
@@ -36,10 +43,7 @@ type MemoryListProps = {
   initialError?: string;
 };
 
-type ArchivedFilter =
-  | "all"
-  | "active"
-  | "archived";
+type LifecycleFilter = "all" | "current" | MemoryLifecycleStatus;
 
 function formatEnum(value?: string) {
   if (!value) {
@@ -48,9 +52,7 @@ function formatEnum(value?: string) {
 
   return value
     .replaceAll("_", " ")
-    .replace(/\b\w/g, (character) =>
-      character.toUpperCase(),
-    );
+    .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function formatDate(value?: string) {
@@ -72,14 +74,25 @@ function formatDate(value?: string) {
 }
 
 function getPersonName(memory: Memory) {
-  if (
-    memory.personId &&
-    typeof memory.personId === "object"
-  ) {
-    return (
-      memory.personId.preferredName ??
-      memory.personId.name
+  const linkedNames = (memory.personLinks ?? [])
+    .filter(
+      (link) =>
+        link.relation === "primary_subject" || link.relation === "participant",
+    )
+    .map(
+      (link) =>
+        link.displayNameSnapshot ??
+        (typeof link.personId === "object"
+          ? (link.personId.preferredName ?? link.personId.name)
+          : "Linked person"),
     );
+
+  if (linkedNames.length) {
+    return linkedNames.join(", ");
+  }
+
+  if (memory.personId && typeof memory.personId === "object") {
+    return memory.personId.preferredName ?? memory.personId.name;
   }
 
   if (typeof memory.personId === "string") {
@@ -89,20 +102,14 @@ function getPersonName(memory: Memory) {
   return null;
 }
 
-function matchesSearch(
-  memory: Memory,
-  search: string,
-) {
+function matchesSearch(memory: Memory, search: string) {
   if (!search.trim()) {
     return true;
   }
 
-  const normalizedSearch = search
-    .trim()
-    .toLowerCase();
+  const normalizedSearch = search.trim().toLowerCase();
 
-  const personName =
-    getPersonName(memory)?.toLowerCase() ?? "";
+  const personName = getPersonName(memory)?.toLowerCase() ?? "";
 
   return [
     memory.content,
@@ -111,43 +118,34 @@ function matchesSearch(
     memory.accessLevel,
     memory.sensitivity,
     memory.verificationStatus,
+    memory.scope,
     personName,
     ...(memory.tags ?? []),
-  ].some((value) =>
-    value
-      ?.toString()
-      .toLowerCase()
-      .includes(normalizedSearch),
-  );
+  ].some((value) => value?.toString().toLowerCase().includes(normalizedSearch));
 }
 
 export function MemoryList({
   initialMemories,
   initialError = "",
 }: MemoryListProps) {
-  const [memories, setMemories] = useState(
-    initialMemories ?? [],
-  );
+  const [memories, setMemories] = useState(initialMemories ?? []);
+
+  useEffect(() => {
+    setMemories(initialMemories ?? []);
+  }, [initialMemories]);
 
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [source, setSource] = useState("");
-  const [accessLevel, setAccessLevel] =
-    useState("");
-  const [sensitivity, setSensitivity] =
-    useState("");
-  const [
-    verificationStatus,
-    setVerificationStatus,
-  ] = useState("");
-  const [archived, setArchived] =
-    useState<ArchivedFilter>("active");
+  const [scope, setScope] = useState("");
+  const [accessLevel, setAccessLevel] = useState("");
+  const [sensitivity, setSensitivity] = useState("");
+  const [verificationStatus, setVerificationStatus] = useState("");
+  const [lifecycle, setLifecycle] = useState<LifecycleFilter>("current");
 
-  const [actionMemoryId, setActionMemoryId] =
-    useState<string | null>(null);
+  const [actionMemoryId, setActionMemoryId] = useState<string | null>(null);
 
-  const [actionError, setActionError] =
-    useState("");
+  const [actionError, setActionError] = useState("");
 
   const filteredMemories = useMemo(() => {
     return memories.filter((memory) => {
@@ -159,46 +157,41 @@ export function MemoryList({
         return false;
       }
 
-      if (
-        source &&
-        memory.source !== source
-      ) {
+      if (source && memory.source !== source) {
         return false;
       }
 
       if (
-        accessLevel &&
-        memory.accessLevel !== accessLevel
+        scope &&
+        (memory.scope ??
+          (memory.personId ? MemoryScope.INDIVIDUAL : MemoryScope.GENERAL)) !==
+          scope
       ) {
         return false;
       }
 
-      if (
-        sensitivity &&
-        memory.sensitivity !== sensitivity
-      ) {
+      if (accessLevel && memory.accessLevel !== accessLevel) {
+        return false;
+      }
+
+      if (sensitivity && memory.sensitivity !== sensitivity) {
         return false;
       }
 
       if (
         verificationStatus &&
-        memory.verificationStatus !==
-          verificationStatus
+        memory.verificationStatus !== verificationStatus
       ) {
         return false;
       }
 
-      if (
-        archived === "active" &&
-        memory.isArchived
-      ) {
+      const lifecycleStatus = getMemoryLifecycleStatus(memory);
+
+      if (lifecycle === "current" && lifecycleStatus !== MemoryLifecycleStatus.ACTIVE) {
         return false;
       }
 
-      if (
-        archived === "archived" &&
-        !memory.isArchived
-      ) {
+      if (lifecycle !== "all" && lifecycle !== "current" && lifecycleStatus !== lifecycle) {
         return false;
       }
 
@@ -209,44 +202,40 @@ export function MemoryList({
     search,
     type,
     source,
+    scope,
     accessLevel,
     sensitivity,
     verificationStatus,
-    archived,
+    lifecycle,
   ]);
 
   const stats = useMemo(() => {
-    const activeMemories = memories.filter(
-      (memory) => !memory.isArchived,
-    );
+    const activeMemories = memories.filter(isCurrentMemory);
 
     return {
       total: memories.length,
 
       public: activeMemories.filter(
-        (memory) =>
-          memory.accessLevel ===
-          MemoryAccessLevel.PUBLIC,
+        (memory) => memory.accessLevel === MemoryAccessLevel.PUBLIC,
       ).length,
 
       ownerOnly: activeMemories.filter(
-        (memory) =>
-          memory.accessLevel ===
-          MemoryAccessLevel.OWNER_ONLY,
+        (memory) => memory.accessLevel === MemoryAccessLevel.OWNER_ONLY,
       ).length,
 
       personSpecific: activeMemories.filter(
         (memory) =>
-          Boolean(memory.personId),
+          (memory.scope ??
+            (memory.personId
+              ? MemoryScope.INDIVIDUAL
+              : MemoryScope.GENERAL)) !== MemoryScope.GENERAL,
       ).length,
 
-      disputed: activeMemories.filter(
-        (memory) => memory.isDisputed,
+      disputed: memories.filter(
+        (memory) => getMemoryLifecycleStatus(memory) === MemoryLifecycleStatus.DISPUTED,
       ).length,
 
-      archived: memories.filter(
-        (memory) => memory.isArchived,
-      ).length,
+      historical: memories.filter((memory) => !isCurrentMemory(memory)).length,
     };
   }, [memories]);
 
@@ -277,21 +266,18 @@ export function MemoryList({
       icon: ShieldAlert,
     },
     {
-      label: "Archived",
-      value: stats.archived,
+      label: "Historical",
+      value: stats.historical,
       icon: Archive,
     },
   ];
 
-  async function handleArchive(
-    memory: Memory,
-  ) {
+  async function handleArchive(memory: Memory) {
     setActionError("");
     setActionMemoryId(memory._id);
 
     try {
-      const updatedMemory =
-        await archiveMemory(memory._id);
+      const updatedMemory = await archiveMemory(memory._id);
 
       setMemories((current) =>
         current.map((item) =>
@@ -315,15 +301,12 @@ export function MemoryList({
     }
   }
 
-  async function handleRestore(
-    memory: Memory,
-  ) {
+  async function handleRestore(memory: Memory) {
     setActionError("");
     setActionMemoryId(memory._id);
 
     try {
-      const updatedMemory =
-        await restoreMemory(memory._id);
+      const updatedMemory = await restoreMemory(memory._id);
 
       setMemories((current) =>
         current.map((item) =>
@@ -347,11 +330,9 @@ export function MemoryList({
     }
   }
 
-  async function handleDelete(
-    memory: Memory,
-  ) {
+  async function handleDelete(memory: Memory) {
     const confirmed = window.confirm(
-      "Delete this memory permanently? This action cannot be undone.",
+      "Forget this memory? HSAKAA will stop retrieving it, but the owner-only audit record will remain.",
     );
 
     if (!confirmed) {
@@ -365,15 +346,22 @@ export function MemoryList({
       await deleteMemory(memory._id);
 
       setMemories((current) =>
-        current.filter(
-          (item) => item._id !== memory._id,
+        current.map((item) =>
+          item._id === memory._id
+            ? {
+                ...item,
+                lifecycleStatus: MemoryLifecycleStatus.FORGOTTEN,
+                isActive: false,
+                isArchived: true,
+              }
+            : item,
         ),
       );
     } catch (caughtError) {
       setActionError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Unable to delete memory.",
+          : "Unable to forget memory.",
       );
     } finally {
       setActionMemoryId(null);
@@ -388,9 +376,7 @@ export function MemoryList({
             <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
 
             <div>
-              <p className="font-bold text-red-100">
-                Unable to load memories
-              </p>
+              <p className="font-bold text-red-100">Unable to load memories</p>
 
               <p className="mt-1 text-sm leading-6 text-red-100/60">
                 {initialError}
@@ -443,89 +429,71 @@ export function MemoryList({
 
               <input
                 value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search memories, people or tags..."
                 className="min-h-12 w-full rounded-[16px] border border-white/10 bg-[#030608] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-[#C6FF32]/50"
               />
             </div>
 
             <Link
-              href="/admin/hsakaa/memory/new"
+              href="/admin/hsakaa/memory#memory-inbox"
               className="inline-flex min-h-12 items-center justify-center rounded-[16px] bg-[#C6FF32] px-5 text-sm font-black text-[#030608]"
             >
-              New memory
+              Capture memory
             </Link>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
             <select
               value={type}
-              onChange={(event) =>
-                setType(event.target.value)
-              }
+              onChange={(event) => setType(event.target.value)}
               className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
             >
-              <option value="">
-                All types
-              </option>
+              <option value="">All types</option>
 
-              {Object.values(MemoryType).map(
-                (value) => (
-                  <option
-                    key={value}
-                    value={value}
-                  >
-                    {formatEnum(value)}
-                  </option>
-                ),
-              )}
+              {ALL_MEMORY_TYPE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
 
             <select
               value={source}
-              onChange={(event) =>
-                setSource(event.target.value)
-              }
+              onChange={(event) => setSource(event.target.value)}
               className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
             >
-              <option value="">
-                All sources
-              </option>
+              <option value="">All sources</option>
 
-              {Object.values(MemorySource).map(
-                (value) => (
-                  <option
-                    key={value}
-                    value={value}
-                  >
-                    {formatEnum(value)}
-                  </option>
-                ),
-              )}
+              {Object.values(MemorySource).map((value) => (
+                <option key={value} value={value}>
+                  {formatEnum(value)}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={scope}
+              onChange={(event) => setScope(event.target.value)}
+              className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
+            >
+              <option value="">All scopes</option>
+              {Object.values(MemoryScope).map((value) => (
+                <option key={value} value={value}>
+                  {formatEnum(value)}
+                </option>
+              ))}
             </select>
 
             <select
               value={accessLevel}
-              onChange={(event) =>
-                setAccessLevel(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setAccessLevel(event.target.value)}
               className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
             >
-              <option value="">
-                All access
-              </option>
+              <option value="">All access</option>
 
-              {Object.values(
-                MemoryAccessLevel,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemoryAccessLevel).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
@@ -533,24 +501,13 @@ export function MemoryList({
 
             <select
               value={sensitivity}
-              onChange={(event) =>
-                setSensitivity(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setSensitivity(event.target.value)}
               className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
             >
-              <option value="">
-                All sensitivity
-              </option>
+              <option value="">All sensitivity</option>
 
-              {Object.values(
-                MemorySensitivity,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemorySensitivity).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
@@ -558,48 +515,34 @@ export function MemoryList({
 
             <select
               value={verificationStatus}
-              onChange={(event) =>
-                setVerificationStatus(
-                  event.target.value,
-                )
-              }
+              onChange={(event) => setVerificationStatus(event.target.value)}
               className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
             >
-              <option value="">
-                All verification
-              </option>
+              <option value="">All verification</option>
 
-              {Object.values(
-                MemoryVerificationStatus,
-              ).map((value) => (
-                <option
-                  key={value}
-                  value={value}
-                >
+              {Object.values(MemoryVerificationStatus).map((value) => (
+                <option key={value} value={value}>
                   {formatEnum(value)}
                 </option>
               ))}
             </select>
 
             <select
-              value={archived}
+              value={lifecycle}
               onChange={(event) =>
-                setArchived(
-                  event.target
-                    .value as ArchivedFilter,
-                )
+                setLifecycle(event.target.value as LifecycleFilter)
               }
               className="min-h-11 rounded-[14px] border border-white/10 bg-[#030608] px-3 text-sm text-white/70 outline-none focus:border-[#C6FF32]/50"
             >
-              <option value="active">
-                Active
-              </option>
-              <option value="archived">
-                Archived
-              </option>
-              <option value="all">
-                All records
-              </option>
+              <option value="current">Current truth</option>
+              <option value="all">All lifecycle states</option>
+              {Object.values(MemoryLifecycleStatus)
+                .filter((status) => status !== MemoryLifecycleStatus.ACTIVE)
+                .map((status) => (
+                  <option key={status} value={status}>
+                    {getMemoryLifecycleLabel(status)}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -609,10 +552,7 @@ export function MemoryList({
               <span className="font-bold text-white">
                 {filteredMemories.length}
               </span>{" "}
-              of{" "}
-              <span className="font-bold text-white">
-                {memories.length}
-              </span>{" "}
+              of <span className="font-bold text-white">{memories.length}</span>{" "}
               memories
             </p>
 
@@ -625,7 +565,7 @@ export function MemoryList({
                 setAccessLevel("");
                 setSensitivity("");
                 setVerificationStatus("");
-                setArchived("active");
+                setLifecycle("current");
               }}
               className="text-sm font-bold text-white/40 transition hover:text-[#C6FF32]"
             >
@@ -646,25 +586,22 @@ export function MemoryList({
           </h2>
 
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/40">
-            Adjust your filters or create a new
-            memory for HSAKAA.
+            Adjust your filters or capture a new memory for HSAKAA.
           </p>
 
           <Link
-            href="/admin/hsakaa/memory/new"
+            href="/admin/hsakaa/memory#memory-inbox"
             className="mt-6 inline-flex min-h-11 items-center justify-center rounded-[14px] bg-[#C6FF32] px-5 text-sm font-black text-[#030608]"
           >
-            Create memory
+            Capture memory
           </Link>
         </section>
       ) : (
         <section className="grid gap-4 xl:grid-cols-2">
           {filteredMemories.map((memory) => {
-            const personName =
-              getPersonName(memory);
+            const personName = getPersonName(memory);
 
-            const processing =
-              actionMemoryId === memory._id;
+            const processing = actionMemoryId === memory._id;
 
             return (
               <article
@@ -674,22 +611,25 @@ export function MemoryList({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex flex-wrap gap-2">
                     <span className="rounded-full border border-[#C6FF32]/20 bg-[#C6FF32]/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#C6FF32]">
-                      {formatEnum(memory.type)}
+                      {formatEnum(
+                        memory.scope ??
+                          (memory.personId
+                            ? MemoryScope.INDIVIDUAL
+                            : MemoryScope.GENERAL),
+                      )}
+                    </span>
+
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white/45">
+                      {getMemoryTypeLabel(memory.type)}
                     </span>
 
                     <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white/45">
                       {formatEnum(memory.source)}
                     </span>
 
-                    {memory.isArchived ? (
+                    {getMemoryLifecycleStatus(memory) !== MemoryLifecycleStatus.ACTIVE ? (
                       <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-amber-200">
-                        Archived
-                      </span>
-                    ) : null}
-
-                    {memory.isDisputed ? (
-                      <span className="rounded-full border border-red-300/20 bg-red-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-red-200">
-                        Disputed
+                        {getMemoryLifecycleLabel(getMemoryLifecycleStatus(memory))}
                       </span>
                     ) : null}
                   </div>
@@ -712,34 +652,28 @@ export function MemoryList({
                       <Globe2 className="h-3.5 w-3.5" />
                     )}
 
-                    {personName ?? "Global"}
+                    {personName ?? "General"}
                   </span>
 
                   <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-bold text-white/45">
-                    {formatEnum(
-                      memory.accessLevel,
-                    )}
+                    {formatEnum(memory.accessLevel)}
                   </span>
 
                   <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-bold text-white/45">
-                    {formatEnum(
-                      memory.sensitivity,
-                    )}
+                    {formatEnum(memory.sensitivity)}
                   </span>
                 </div>
 
                 {memory.tags?.length ? (
                   <div className="mt-4 flex flex-wrap gap-2">
-                    {memory.tags
-                      .slice(0, 6)
-                      .map((tag) => (
-                        <span
-                          key={tag}
-                          className="rounded-lg bg-white/[0.04] px-2.5 py-1 text-xs text-white/35"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
+                    {memory.tags.slice(0, 6).map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded-lg bg-white/[0.04] px-2.5 py-1 text-xs text-white/35"
+                      >
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 ) : null}
 
@@ -750,10 +684,7 @@ export function MemoryList({
                     </p>
 
                     <p className="mt-1 font-black text-white">
-                      {Math.round(
-                        memory.importance * 100,
-                      )}
-                      %
+                      {Math.round(memory.importance * 100)}%
                     </p>
                   </div>
 
@@ -763,65 +694,61 @@ export function MemoryList({
                     </p>
 
                     <p className="mt-1 font-black text-white">
-                      {Math.round(
-                        memory.confidence * 100,
-                      )}
-                      %
+                      {Math.round(memory.confidence * 100)}%
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-white/10 pt-4">
                   <p className="text-xs text-white/25">
-                    Updated{" "}
-                    {formatDate(
-                      memory.updatedAt ??
-                        memory.createdAt,
-                    )}
+                    Updated {formatDate(memory.updatedAt ?? memory.createdAt)}
                   </p>
 
                   <div className="flex items-center gap-2">
-                    <Link
-                      href={`/admin/hsakaa/memory/${memory._id}/edit`}
-                      aria-label="Edit memory"
-                      className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/45 transition hover:border-[#C6FF32]/30 hover:text-[#C6FF32]"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-
-                    {memory.isArchived ? (
-                      <button
-                        type="button"
-                        disabled={processing}
-                        onClick={() =>
-                          handleRestore(memory)
-                        }
-                        aria-label="Restore memory"
-                        className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/45 transition hover:border-[#C6FF32]/30 hover:text-[#C6FF32] disabled:cursor-not-allowed disabled:opacity-40"
+                    {isCurrentMemory(memory) ? (
+                      <Link
+                        href={`/admin/hsakaa/memory/${memory._id}/edit`}
+                        aria-label="Edit memory"
+                        className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/45 transition hover:border-[#C6FF32]/30 hover:text-[#C6FF32]"
                       >
-                        <RotateCcw className="h-4 w-4" />
-                      </button>
-                    ) : (
+                        <Pencil className="h-4 w-4" />
+                      </Link>
+                    ) : null}
+
+                    {isCurrentMemory(memory) ? (
                       <button
                         type="button"
                         disabled={processing}
-                        onClick={() =>
-                          handleArchive(memory)
-                        }
+                        onClick={() => handleArchive(memory)}
                         aria-label="Archive memory"
                         className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/45 transition hover:border-amber-300/30 hover:text-amber-200 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Archive className="h-4 w-4" />
                       </button>
-                    )}
+                    ) : [
+                        MemoryLifecycleStatus.ARCHIVED,
+                        MemoryLifecycleStatus.EXPIRED,
+                      ].includes(getMemoryLifecycleStatus(memory)) ? (
+                      <button
+                        type="button"
+                        disabled={processing}
+                        onClick={() => handleRestore(memory)}
+                        aria-label="Restore memory"
+                        className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/45 transition hover:border-[#C6FF32]/30 hover:text-[#C6FF32] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                    ) : null}
 
                     <button
                       type="button"
-                      disabled={processing}
-                      onClick={() =>
-                        handleDelete(memory)
+                      disabled={
+                        processing ||
+                        getMemoryLifecycleStatus(memory) ===
+                          MemoryLifecycleStatus.FORGOTTEN
                       }
-                      aria-label="Delete memory"
+                      onClick={() => handleDelete(memory)}
+                      aria-label="Forget memory"
                       className="grid h-10 w-10 place-items-center rounded-xl border border-red-300/10 bg-red-300/[0.04] text-red-200/50 transition hover:border-red-300/30 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash2 className="h-4 w-4" />

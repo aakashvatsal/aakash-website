@@ -1,3 +1,5 @@
+import { getAdminBackendHeaders } from "@/lib/api/admin-backend-headers";
+
 import type {
   AdminDashboardData,
 } from "@/types/admin-dashboard";
@@ -14,12 +16,12 @@ interface ApiResponse<T> {
 
 export async function getAdminDashboard(): Promise<AdminDashboardData> {
   const response = await fetch(
-    `${API_URL}/admin/dashboard`,
+    `${API_URL}/dashboard`,
     {
       method: "GET",
-      headers: {
+      headers: getAdminBackendHeaders({
         "Content-Type": "application/json",
-      },
+      }),
       credentials: "include",
       cache: "no-store",
     },

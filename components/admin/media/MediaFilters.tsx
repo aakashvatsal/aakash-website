@@ -42,11 +42,19 @@ const platformOptions = [
   },
   {
     label: "X / Twitter",
-    value: "twitter",
+    value: "x",
   },
   {
     label: "Facebook",
     value: "facebook",
+  },
+  {
+    label: "Threads",
+    value: "threads",
+  },
+  {
+    label: "WhatsApp",
+    value: "whatsapp",
   },
 ];
 
@@ -82,6 +90,10 @@ const statusOptions = [
   {
     label: "Posted",
     value: "posted",
+  },
+  {
+    label: "Failed",
+    value: "failed",
   },
   {
     label: "Cancelled",
@@ -125,6 +137,26 @@ const postTypeOptions = [
   {
     label: "Story",
     value: "story",
+  },
+  {
+    label: "Poll",
+    value: "poll",
+  },
+  {
+    label: "Thread",
+    value: "thread",
+  },
+  {
+    label: "WhatsApp message",
+    value: "whatsapp_message",
+  },
+  {
+    label: "WhatsApp status",
+    value: "whatsapp_status",
+  },
+  {
+    label: "WhatsApp template",
+    value: "whatsapp_template",
   },
 ];
 

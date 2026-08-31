@@ -1,3 +1,5 @@
+import { getAdminBackendHeaders } from "@/lib/api/admin-backend-headers";
+
 import type {
   BodyMeasurement,
   HabitEntry,
@@ -183,6 +185,7 @@ export async function getHealthEntries(): Promise<
         method: "GET",
 
         cache: "no-store",
+        headers: getAdminBackendHeaders(),
       },
     );
 
@@ -209,6 +212,7 @@ export async function getHealthEntry(
         method: "GET",
 
         cache: "no-store",
+        headers: getAdminBackendHeaders(),
       },
     );
 

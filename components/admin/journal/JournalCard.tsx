@@ -257,7 +257,7 @@ export function JournalCard({
             )}
 
             <Link
-              href={`/admin/journal/${entry._id}`}
+              href={`/admin/journal/${entry._id}/edit`}
               aria-label="Edit journal entry"
               title="Edit"
               className="grid h-10 w-10 place-items-center rounded-xl text-white/30 transition hover:bg-[#C6FF32]/10 hover:text-[#C6FF32]"

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Bot, Home, Menu } from "lucide-react";
+import { BookOpen, Bot, Home, Menu, Search } from "lucide-react";
 import { motion } from "framer-motion";
 
 export function MobileNav() {
@@ -46,8 +46,8 @@ export function MobileNav() {
             Home
           </Link>
 
-          <Link href="/learning" className="flex flex-col items-center gap-1">
-            Learn
+          <Link href="/journal" className="flex flex-col items-center gap-1">
+            Journal
           </Link>
 
           <Link
@@ -58,12 +58,14 @@ export function MobileNav() {
             HSAKAA
           </Link>
 
-          <Link href="/reading" className="flex flex-col items-center gap-1">
-            Books
+          <Link href="/library" className="flex flex-col items-center gap-1">
+            <BookOpen className="h-4 w-4" />
+            Library
           </Link>
 
-          <Link href="/contact" className="flex flex-col items-center gap-1">
-            More
+          <Link href="/search" className="flex flex-col items-center gap-1">
+            <Search className="h-4 w-4" />
+            Search
           </Link>
         </div>
       </div>

@@ -18,7 +18,6 @@ import {
   RefreshCcw,
   Search,
   Send,
-  ShieldCheck,
   Sparkles,
   UserRound,
 } from "lucide-react";
@@ -264,8 +263,14 @@ export function HsakaaPlayground({
   initialPeople,
   initialError = "",
 }: HsakaaPlaygroundProps) {
-  const memories = initialMemories ?? [];
-  const people = initialPeople ?? [];
+  const memories = useMemo(
+    () => initialMemories ?? [],
+    [initialMemories],
+  );
+  const people = useMemo(
+    () => initialPeople ?? [],
+    [initialPeople],
+  );
 
   const [identity, setIdentity] =
     useState<PlaygroundIdentity>({

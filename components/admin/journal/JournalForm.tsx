@@ -465,6 +465,37 @@ export function JournalForm({
   const isEditMode =
     Boolean(entry?._id);
 
+  const entryMetadata =
+    entry?.metadata &&
+    typeof entry.metadata ===
+      "object"
+      ? entry.metadata
+      : {};
+
+  const isPrivateHsakaaDaily =
+    entryMetadata.dailySynthesis ===
+    true;
+
+  const isPublicHsakaaDaily =
+    entryMetadata.dailyPublicDerivative ===
+    true;
+
+  const isHsakaaDaily =
+    isPrivateHsakaaDaily ||
+    isPublicHsakaaDaily;
+
+  const approvalStatus =
+    typeof entryMetadata.approvalStatus ===
+    "string"
+      ? entryMetadata.approvalStatus
+      : undefined;
+
+  const publishLocked =
+    isPrivateHsakaaDaily ||
+    (isPublicHsakaaDaily &&
+      approvalStatus !==
+        "approved");
+
   const [
     form,
     setForm,
@@ -770,9 +801,35 @@ export function JournalForm({
       if (
         entry?._id
       ) {
+        const updatePayload:
+          Partial<JournalEntryPayload> =
+          { ...payload };
+
+        if (isHsakaaDaily) {
+          delete updatePayload.date;
+          delete updatePayload.dateKey;
+          delete updatePayload.slug;
+          delete updatePayload.source;
+          delete updatePayload.sourceExternalId;
+          delete updatePayload.metadata;
+
+          if (isPrivateHsakaaDaily) {
+            updatePayload.visibility =
+              "private";
+            updatePayload.isPublished =
+              false;
+          } else if (
+            approvalStatus !==
+            "approved"
+          ) {
+            updatePayload.isPublished =
+              false;
+          }
+        }
+
         await updateJournalEntry(
           entry._id,
-          payload,
+          updatePayload,
         );
       } else {
         await createJournalEntry(
@@ -1134,7 +1191,7 @@ export function JournalForm({
                           .checked,
                       )
                     }
-                    className="h-4 w-4 accent-[#C6FF32]"
+                    className="h-4 w-4 accent-[#C6FF32] disabled:cursor-not-allowed disabled:opacity-40"
                   />
 
                   Workout completed
@@ -1691,6 +1748,7 @@ export function JournalForm({
                     form.visibility ??
                     "private"
                   }
+                  disabled={isHsakaaDaily}
                   onChange={(
                     event,
                   ) =>
@@ -1734,6 +1792,7 @@ export function JournalForm({
                     form.source ??
                     "manual"
                   }
+                  disabled={isHsakaaDaily}
                   onChange={(
                     event,
                   ) =>
@@ -1769,11 +1828,18 @@ export function JournalForm({
 
               <StateToggle
                 label="Published"
-                description="Allow this entry to appear in public Journal views when visibility is Public."
+                description={
+                  isPrivateHsakaaDaily
+                    ? "The private HSAKAA journal can never be published. Use its separate public-safe companion."
+                    : isPublicHsakaaDaily && approvalStatus !== "approved"
+                      ? "Approve this public-safe draft before publishing it."
+                      : "Allow this entry to appear in public Journal views when visibility is Public."
+                }
                 checked={
                   form.isPublished ??
                   false
                 }
+                disabled={publishLocked}
                 onChange={(
                   checked,
                 ) =>
@@ -1952,6 +2018,9 @@ type StateToggleProps = {
   checked:
     boolean;
 
+  disabled?:
+    boolean;
+
   onChange: (
     checked: boolean,
   ) => void;
@@ -1961,6 +2030,7 @@ function StateToggle({
   label,
   description,
   checked,
+  disabled = false,
   onChange,
 }: StateToggleProps) {
   return (
@@ -1982,6 +2052,7 @@ function StateToggle({
         checked={
           checked
         }
+        disabled={disabled}
         onChange={(
           event,
         ) =>

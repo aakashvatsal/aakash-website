@@ -1,3 +1,5 @@
+import { getAdminBackendHeaders } from "@/lib/api/admin-backend-headers";
+
 import type {
   Company,
   CompanyApiResponse,
@@ -152,10 +154,7 @@ export async function getCompanies(
     await fetch(endpoint, {
       method: "GET",
 
-      headers: {
-        Accept:
-          "application/json",
-      },
+      headers: getAdminBackendHeaders(),
 
       cache: "no-store",
     });
@@ -221,10 +220,7 @@ export async function getCompanyById(
       {
         method: "GET",
 
-        headers: {
-          Accept:
-            "application/json",
-        },
+        headers: getAdminBackendHeaders(),
 
         cache: "no-store",
       },

@@ -16,7 +16,7 @@ export async function GET(
 
     const response =
       await fetch(
-        `${API_URL}/library?${query}`,
+        `${API_URL}/library/public?${query}`,
         {
           method: "GET",
           headers: {

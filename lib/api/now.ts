@@ -1,3 +1,5 @@
+import { getAdminBackendHeaders } from "@/lib/api/admin-backend-headers";
+
 import type {
   NowActivityType,
   NowAvailability,
@@ -139,11 +141,12 @@ export async function getNowStatus(): Promise<
 > {
   const response =
     await fetch(
-      `${API_BASE}/now/public`,
+      `${API_BASE}/now/current`,
       {
         method: "GET",
 
         cache: "no-store",
+        headers: getAdminBackendHeaders(),
       },
     );
 

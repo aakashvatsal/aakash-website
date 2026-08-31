@@ -1,3 +1,5 @@
+import { getAdminBackendHeaders } from "@/lib/api/admin-backend-headers";
+
 import type {
   JournalEntry,
   JournalEntryType,
@@ -185,9 +187,7 @@ export async function getJournalEntries(): Promise<
       `${API_URL}/journal?page=1&limit=100`,
       {
         cache: "no-store",
-
-        credentials:
-          "include",
+        headers: getAdminBackendHeaders(),
       },
     );
 
@@ -214,9 +214,7 @@ export async function getJournalEntry(
       )}`,
       {
         cache: "no-store",
-
-        credentials:
-          "include",
+        headers: getAdminBackendHeaders(),
       },
     );
 

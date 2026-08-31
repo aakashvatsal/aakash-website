@@ -36,8 +36,6 @@ export interface Book {
 
   keyTakeaways?: string[];
 
-  notes?: string;
-
   quotes?: string[];
 
   highlightsCount?: number;
@@ -131,6 +129,21 @@ const API_URL =
   process.env.BACKEND_API_URL ??
   "http://localhost:4000/api/v1";
 
+function emptyLibraryResponse(
+  page: number,
+  limit: number,
+): LibraryApiResponse {
+  return {
+    data: [],
+    pagination: {
+      page,
+      limit,
+      total: 0,
+      totalPages: 0,
+    },
+  };
+}
+
 export async function getBooks({
   page = 1,
   limit = 12,
@@ -169,29 +182,51 @@ export async function getBooks({
     );
   }
 
-  const response =
-    await fetch(
-      `${API_URL}/library?${query.toString()}`,
-      {
-        method: "GET",
+  const endpoint =
+    `${API_URL}/library/public?${query.toString()}`;
 
-        headers: {
-          "Content-Type":
-            "application/json",
+  try {
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method: "GET",
+
+          headers: {
+            Accept: "application/json",
+          },
+
+          cache: "no-store",
         },
+      );
 
-        cache:
-          "no-store",
-      },
+    if (!response.ok) {
+      console.error(
+        "Unable to fetch public library:",
+        {
+          endpoint,
+          status: response.status,
+        },
+      );
+
+      return emptyLibraryResponse(
+        page,
+        limit,
+      );
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error(
+      "Failed to fetch public library:",
+      error,
     );
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch books: ${response.status}`,
+    return emptyLibraryResponse(
+      page,
+      limit,
     );
   }
-
-  return response.json();
 }
 
 export async function getBookBySlug(
@@ -199,7 +234,7 @@ export async function getBookBySlug(
 ): Promise<Book | null> {
   const response =
     await fetch(
-      `${API_URL}/library/slug/${encodeURIComponent(
+      `${API_URL}/library/public/slug/${encodeURIComponent(
         slug,
       )}`,
       {
@@ -222,9 +257,15 @@ export async function getBookBySlug(
   }
 
   if (!response.ok) {
-    throw new Error(
-      `Failed to fetch book: ${response.status}`,
+    console.error(
+      "Unable to fetch public book:",
+      {
+        slug,
+        status: response.status,
+      },
     );
+
+    return null;
   }
 
   const result =
@@ -240,7 +281,7 @@ export async function getBookHighlights(
 ): Promise<LibraryHighlight[]> {
   const response =
     await fetch(
-      `${API_URL}/library/${encodeURIComponent(
+      `${API_URL}/library/public/${encodeURIComponent(
         libraryItemId,
       )}/highlights`,
       {

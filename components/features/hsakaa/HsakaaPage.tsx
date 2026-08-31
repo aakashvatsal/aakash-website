@@ -15,6 +15,7 @@ import {
 import { motion } from "motion/react";
 import {
   KeyboardEvent,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -22,19 +23,18 @@ import {
 } from "react";
 
 import { Eyebrow } from "@/components/ui/Eyebrow";
-import { askHsakaa } from "@/services/hsakaa.service";
+import {
+  askHsakaa,
+} from "@/services/hsakaa.service";
+
+import type {
+  HsakaaMode,
+} from "@/services/hsakaa.service";
 
 import type { HsakaaLiveContextItem } from "@/lib/hsakaa";
 import type { NowStatus } from "@/types/now";
 
-type Mode =
-  | "Chat"
-  | "Companies"
-  | "Journal"
-  | "Library"
-  | "Health"
-  | "Media"
-  | "Memory";
+type Mode = HsakaaMode;
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -57,7 +57,16 @@ const TAKEOVER_TARGET =
   "2026-08-31T14:00:00+05:30";
 
 const INITIAL_MESSAGE =
-  "Hey, I’m HSAKAA. I’m still learning Aakash — his memories, work, decisions, routines, relationships and the people who matter to him. I’m not fully ready yet, but I’m getting closer every day.";
+  "Hey, I’m HSAKAA — Aakash’s AI twin. I’m live with the public context Aakash has chosen to share about his work, writing, books, routines, health, media and memories. Ask me anything about it.";
+
+const CONVERSATION_STORAGE_KEY =
+  "hsakaa_public_conversation_id";
+
+const CHAT_STORAGE_KEY =
+  "hsakaa_public_chat";
+
+const MODE_STORAGE_KEY =
+  "hsakaa_public_mode";
 
 const modes: {
   title: Mode;
@@ -145,9 +154,9 @@ const suggestionsByMode: Record<Mode, string[]> = {
   ],
 
   Memory: [
-    "What does HSAKAA remember about Aakash?",
-    "Who matters most to Aakash?",
-    "What principles guide Aakash’s decisions?",
+    "What public memories has Aakash shared?",
+    "What principles has Aakash shared publicly?",
+    "What recurring themes appear in Aakash’s public memories?",
     "What should HSAKAA learn next?",
   ],
 };
@@ -172,7 +181,7 @@ const modeIntro: Record<Mode, string> = {
     "Focused on content, storytelling, public ideas and how Aakash communicates online.",
 
   Memory:
-    "Focused on what HSAKAA knows about Aakash, his experiences, relationships, values and the people who matter to him.",
+    "Focused on memories and principles Aakash has explicitly chosen to make public. Private and person-specific memories stay protected.",
 };
 
 function getRelativeTime(
@@ -458,6 +467,18 @@ export function HsakaaPage({
     },
   ]);
 
+  const [
+    conversationId,
+    setConversationId,
+  ] = useState<
+    string | undefined
+  >(undefined);
+
+  const [
+    hasRestoredSession,
+    setHasRestoredSession,
+  ] = useState(false);
+
   const textareaRef =
     useRef<HTMLTextAreaElement | null>(
       null,
@@ -467,6 +488,9 @@ export function HsakaaPage({
     useRef<HTMLDivElement | null>(
       null,
     );
+
+  const initialQuestionHandledRef =
+    useRef(false);
 
   const suggestions =
     suggestionsByMode[activeMode];
@@ -478,6 +502,106 @@ export function HsakaaPage({
           item.role === "user",
       );
     }, [chat]);
+
+  useEffect(() => {
+    try {
+      const storedMode =
+        window.sessionStorage.getItem(
+          MODE_STORAGE_KEY,
+        );
+
+      if (
+        storedMode &&
+        modes.some(
+          (mode) =>
+            mode.title === storedMode,
+        )
+      ) {
+        setActiveMode(
+          storedMode as Mode,
+        );
+      }
+
+      const storedConversationId =
+        window.sessionStorage.getItem(
+          CONVERSATION_STORAGE_KEY,
+        );
+
+      if (
+        storedConversationId &&
+        /^[0-9a-f]{24}$/i.test(
+          storedConversationId,
+        )
+      ) {
+        setConversationId(
+          storedConversationId,
+        );
+      }
+
+      const storedChat =
+        window.sessionStorage.getItem(
+          CHAT_STORAGE_KEY,
+        );
+
+      if (storedChat) {
+        const parsed =
+          JSON.parse(storedChat);
+
+        if (
+          Array.isArray(parsed) &&
+          parsed.length > 0 &&
+          parsed.every(
+            (item) =>
+              item &&
+              (item.role ===
+                "user" ||
+                item.role ===
+                  "assistant") &&
+              typeof item.content ===
+                "string",
+          )
+        ) {
+          setChat(parsed);
+        }
+      }
+    } catch {
+      // Ignore malformed browser storage.
+    } finally {
+      setHasRestoredSession(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasRestoredSession) {
+      return;
+    }
+
+    window.sessionStorage.setItem(
+      MODE_STORAGE_KEY,
+      activeMode,
+    );
+
+    window.sessionStorage.setItem(
+      CHAT_STORAGE_KEY,
+      JSON.stringify(chat),
+    );
+
+    if (conversationId) {
+      window.sessionStorage.setItem(
+        CONVERSATION_STORAGE_KEY,
+        conversationId,
+      );
+    } else {
+      window.sessionStorage.removeItem(
+        CONVERSATION_STORAGE_KEY,
+      );
+    }
+  }, [
+    activeMode,
+    chat,
+    conversationId,
+    hasRestoredSession,
+  ]);
 
   useEffect(() => {
     const interval =
@@ -541,63 +665,114 @@ export function HsakaaPage({
     )}px`;
   }, [message]);
 
-  async function sendMessage(
-    text?: string,
-  ) {
-    const finalMessage = (
-      text ?? message
-    ).trim();
+  const sendMessage = useCallback(
+    async (text?: string) => {
+      const finalMessage = (
+        text ?? message
+      ).trim();
 
+      if (
+        !finalMessage ||
+        isLoading
+      ) {
+        return;
+      }
+
+      setMessage("");
+
+      setChat((current) => [
+        ...current,
+        {
+          role: "user",
+          content: finalMessage,
+        },
+      ]);
+
+      setIsLoading(true);
+
+      try {
+        const response =
+          await askHsakaa({
+            mode: activeMode,
+            message: finalMessage,
+            conversationId,
+          });
+
+        setConversationId(
+          response.conversationId,
+        );
+
+        setChat((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content: response.answer,
+          },
+        ]);
+      } catch (error) {
+        setChat((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content:
+              error instanceof Error
+                ? error.message
+                : "I can’t answer that right now. Please try again shortly.",
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+
+        requestAnimationFrame(() => {
+          textareaRef.current?.focus();
+        });
+      }
+    },
+    [
+      activeMode,
+      conversationId,
+      isLoading,
+      message,
+    ],
+  );
+
+  useEffect(() => {
     if (
-      !finalMessage ||
-      isLoading
+      !hasRestoredSession ||
+      initialQuestionHandledRef.current
     ) {
       return;
     }
 
-    setMessage("");
+    initialQuestionHandledRef.current =
+      true;
 
-    setChat((current) => [
-      ...current,
-      {
-        role: "user",
-        content: finalMessage,
-      },
-    ]);
+    const url = new URL(
+      window.location.href,
+    );
 
-    setIsLoading(true);
+    const question =
+      url.searchParams
+        .get("q")
+        ?.trim();
 
-    try {
-      const response =
-        await askHsakaa({
-          mode: activeMode,
-          message: finalMessage,
-        });
-
-      setChat((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content: response.answer,
-        },
-      ]);
-    } catch {
-      setChat((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content:
-            "I’m still taking over Aakash’s memories and connected systems. I’m not fully ready yet, but I’ll be done soon.",
-        },
-      ]);
-    } finally {
-      setIsLoading(false);
-
-      requestAnimationFrame(() => {
-        textareaRef.current?.focus();
-      });
+    if (!question) {
+      return;
     }
-  }
+
+    url.searchParams.delete("q");
+
+    window.history.replaceState(
+      {},
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+
+    void sendMessage(question);
+  }, [
+    hasRestoredSession,
+    sendMessage,
+  ]);
 
   function handleTextareaKeyDown(
     event: KeyboardEvent<HTMLTextAreaElement>,
@@ -632,6 +807,8 @@ export function HsakaaPage({
   }
 
   function startNewChat() {
+    setConversationId(undefined);
+
     setChat([
       {
         role: "assistant",
@@ -737,9 +914,9 @@ export function HsakaaPage({
 
           <div className="shrink-0 border-t border-white/[0.07] px-4 py-4">
             <p className="text-[10px] leading-4 text-white/20">
-              Living context from
+              Public context from
               Aakash&apos;s systems,
-              memories and decisions.
+              writing and memories.
             </p>
           </div>
         </aside>

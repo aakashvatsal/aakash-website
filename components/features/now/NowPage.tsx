@@ -1,5 +1,4 @@
 import {
-  Activity,
   BatteryCharging,
   BookOpen,
   Brain,

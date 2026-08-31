@@ -18,7 +18,6 @@ export enum LibraryItemStatus {
 
 export type LibraryItem = {
   _id: string;
-  userId: string;
   title: string;
   subtitle?: string;
   type: LibraryItemType;
@@ -40,6 +39,7 @@ export type LibraryItem = {
   startedAt?: string;
   completedAt?: string;
   lastReadAt?: string;
+  isPublic: boolean;
   isFavourite: boolean;
   isArchived: boolean;
   isActive: boolean;
@@ -69,13 +69,21 @@ export type LibraryItemPayload = {
   startedAt?: string;
   completedAt?: string;
   lastReadAt?: string;
+  isPublic: boolean;
   isFavourite: boolean;
   isArchived: boolean;
   isActive: boolean;
 };
 
 export type LibraryListResponse = {
-  status: number;
-  message: string;
+  status?: number;
+  statusCode?: number;
+  message?: string;
   data: LibraryItem[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 };

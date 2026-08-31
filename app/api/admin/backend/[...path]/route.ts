@@ -12,8 +12,6 @@ const BACKEND_URL =
   process.env.BACKEND_API_URL ??
   "http://localhost:4000/api/v1";
 
-const ADMIN_API_SECRET =
-  process.env.ADMIN_API_SECRET;
 
 function buildBackendUrl(
   request: NextRequest,
@@ -60,6 +58,7 @@ async function proxyRequest(
     )?.value;
 
   if (
+    !token ||
     !verifyAdminSessionToken(token)
   ) {
     return NextResponse.json(
@@ -69,22 +68,6 @@ async function proxyRequest(
       },
       {
         status: 401,
-      },
-    );
-  }
-
-  if (!ADMIN_API_SECRET) {
-    console.error(
-      "ADMIN_API_SECRET is not configured.",
-    );
-
-    return NextResponse.json(
-      {
-        message:
-          "Server configuration error.",
-      },
-      {
-        status: 500,
       },
     );
   }
@@ -125,10 +108,13 @@ async function proxyRequest(
     );
   }
 
-  headers.set(
-    "x-admin-secret",
-    ADMIN_API_SECRET,
-  );
+  // The browser cookie is verified here and never forwarded directly.
+  // Private HSAKAA receives only the already-verified signed session token
+  // through this server-to-server header.
+  if (path[0] === "hsakaa" && path[1] === "private") {
+    headers.set("x-owner-session", token);
+  }
+
 
   const method =
     request.method;

@@ -7,8 +7,6 @@ import {
   Brain,
   CheckCircle2,
   CircleAlert,
-  Clock3,
-  Globe2,
   Mail,
   Pencil,
   Phone,
@@ -17,7 +15,6 @@ import {
   ShieldCheck,
   ShieldQuestion,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -412,6 +409,18 @@ export function MemoryPersonDetails({
                   {person.relationshipLabel}
                 </p>
               ) : null}
+
+              {person.roleTitle || person.organizationName ? (
+                <p className="mt-1 text-sm text-white/40">
+                  {[person.roleTitle, person.organizationName]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              ) : null}
+
+              {person.location ? (
+                <p className="mt-1 text-sm text-white/30">{person.location}</p>
+              ) : null}
             </div>
           </div>
 
@@ -454,11 +463,99 @@ export function MemoryPersonDetails({
           />
 
           <DetailItem
+            label="Importance"
+            value={`${person.importance ?? 3}/5`}
+          />
+        </div>
+      </section>
+
+      <Section
+        eyebrow="Directory profile"
+        title="Stable identity context"
+        description="Authoritative profile context HSAKAA can use to distinguish this person from people with similar names."
+      >
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <DetailItem
+            label="Organization"
+            value={person.organizationName || "Not specified"}
+          />
+          <DetailItem
+            label="Role"
+            value={person.roleTitle || "Not specified"}
+          />
+          <DetailItem
+            label="Department"
+            value={person.department || "Not specified"}
+          />
+          <DetailItem
+            label="Location"
+            value={person.location || "Not specified"}
+          />
+          <DetailItem
+            label="First met"
+            value={formatDate(person.firstMetAt)}
+          />
+          <DetailItem
+            label="Last interaction"
+            value={formatDate(person.lastInteractionAt)}
+          />
+          <DetailItem
+            label="Importance"
+            value={`${person.importance ?? 3}/5`}
+          />
+          <DetailItem
             label="Identity version"
             value={person.identityVersion}
           />
         </div>
-      </section>
+
+        <div className="mt-6">
+          <p className="mb-3 text-sm font-bold text-white/60">
+            External references
+          </p>
+
+          {person.contactReferences?.length ? (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {person.contactReferences.map((reference, index) => (
+                <article
+                  key={`${reference.source}-${reference.externalId ?? reference.url ?? index}`}
+                  className="rounded-[18px] border border-white/10 bg-black/10 p-4"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white/45">
+                      {formatEnum(reference.source)}
+                    </span>
+                    {reference.label ? (
+                      <span className="text-sm font-bold text-white/65">
+                        {reference.label}
+                      </span>
+                    ) : null}
+                  </div>
+                  {reference.externalId ? (
+                    <p className="mt-2 break-all text-xs text-white/35">
+                      ID: {reference.externalId}
+                    </p>
+                  ) : null}
+                  {reference.url ? (
+                    <a
+                      href={reference.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 block break-all text-xs font-bold text-[#C6FF32]/70 hover:text-[#C6FF32]"
+                    >
+                      {reference.url}
+                    </a>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-[18px] border border-dashed border-white/10 p-5 text-sm text-white/35">
+              No external contact references added.
+            </p>
+          )}
+        </div>
+      </Section>
 
       <Section
         eyebrow="Identity"
@@ -773,7 +870,7 @@ export function MemoryPersonDetails({
           </p>
 
           <Link
-            href={`/admin/hsakaa/memory/new?personId=${person._id}`}
+            href={`/admin/hsakaa/memory?personId=${person._id}#memory-inbox`}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[14px] bg-[#C6FF32] px-4 text-sm font-black text-[#030608]"
           >
             <Plus className="h-4 w-4" />

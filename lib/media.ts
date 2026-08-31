@@ -76,6 +76,7 @@ function filterPublicPosts(
   return posts
     .filter(
       (post) =>
+        post.publishing?.status === "posted" &&
         post.isActive !== false &&
         post.isArchived !== true &&
         post.isPrivate !== true,
@@ -121,7 +122,7 @@ export async function getMediaPosts(
     limit,
   });
 
-  const endpoint = `${API_URL}/media${
+  const endpoint = `${API_URL}/media/public${
     queryString
       ? `?${queryString}`
       : ""

@@ -28,6 +28,7 @@ const platforms: MediaPlatform[] = [
   "x",
   "facebook",
   "threads",
+  "whatsapp",
 ];
 
 const postTypes: MediaPostType[] = [
@@ -40,6 +41,10 @@ const postTypes: MediaPostType[] = [
   "story",
   "article",
   "poll",
+  "thread",
+  "whatsapp_message",
+  "whatsapp_status",
+  "whatsapp_template",
 ];
 
 const statuses: MediaPostStatus[] = [

@@ -10,7 +10,6 @@ import {
   Globe2,
   Layers3,
   MapPin,
-  Target,
   Users,
 } from "lucide-react";
 

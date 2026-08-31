@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   Home,
-  User,
   Building2,
   Bot,
   BookOpen,
@@ -9,17 +8,18 @@ import {
   Dumbbell,
   MessageSquareText,
   Mail,
+  Play,
 } from "lucide-react";
 
 const navItems = [
   { label: "Home", href: "/", icon: Home },
-  { label: "About", href: "/about", icon: User },
   { label: "Companies", href: "/companies", icon: Building2 },
-  { label: "HSAKAA AI", href: "/hsakaa", icon: Bot },
-  { label: "Reading", href: "/reading", icon: BookOpen },
-  { label: "Learning", href: "/learning", icon: MessageSquareText },
-  { label: "Schedule", href: "/schedule", icon: Calendar },
+  { label: "Journal", href: "/journal", icon: MessageSquareText },
+  { label: "Library", href: "/library", icon: BookOpen },
   { label: "Health", href: "/health", icon: Dumbbell },
+  { label: "Media", href: "/media", icon: Play },
+  { label: "Now", href: "/now", icon: Calendar },
+  { label: "HSAKAA AI", href: "/hsakaa", icon: Bot },
 ];
 
 export function Sidebar() {

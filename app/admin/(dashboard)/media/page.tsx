@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { MediaList } from "@/components/admin/media/MediaList";
 import {
@@ -69,7 +70,8 @@ export default async function MediaPage({
       <AdminPageHeader
         eyebrow="Content operating system"
         title="Media"
-        description="Plan, produce, schedule, publish and evaluate content."
+        description="Historical Media records and editing. New content creation is owned by HSAKAA and Media Core."
+        actions={<div className="flex flex-wrap gap-3"><Link href="/admin/media/director" className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black">Content Director</Link><Link href="/admin/media/production" className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]">Production Studio</Link><Link href="/admin/media/calendar" className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]">7-Day Calendar</Link><Link href="/admin/hsakaa/chat" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/70">HSAKAA chat</Link><Link href="/admin/media/core" className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]">Media Core V2</Link></div>}
       />
 
       <MediaList

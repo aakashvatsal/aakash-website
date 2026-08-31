@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
-import SmoothScroll from "@/components/providers/SmoothScroll";
 
 const geist = Geist({
   subsets: ["latin"],

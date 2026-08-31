@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Save } from "lucide-react";
 import { AdminFormFooter } from "../AdminFormFooter";
 import {
   LibraryItem,
@@ -59,6 +58,7 @@ function emptyForm(): LibraryItemPayload {
     startedAt: "",
     completedAt: "",
     lastReadAt: "",
+    isPublic: false,
     isFavourite: false,
     isArchived: false,
     isActive: true,
@@ -88,6 +88,7 @@ function itemToForm(item: LibraryItem): LibraryItemPayload {
     startedAt: toDateInput(item.startedAt),
     completedAt: toDateInput(item.completedAt),
     lastReadAt: toDateInput(item.lastReadAt),
+    isPublic: item.isPublic ?? false,
     isFavourite: item.isFavourite ?? false,
     isArchived: item.isArchived ?? false,
     isActive: item.isActive ?? true,
@@ -664,6 +665,27 @@ export function LibraryForm({ item }: LibraryFormProps) {
             </p>
 
             <div className="mt-5 space-y-3">
+              <label className="flex items-center justify-between gap-4 rounded-[14px] border border-white/10 px-4 py-4">
+                <div>
+                  <p className="text-sm font-bold">Public</p>
+                  <p className="mt-1 text-xs text-white/35">
+                    Publish this item on the public Library. Apple Books imports stay private until you enable this.
+                  </p>
+                </div>
+
+                <input
+                  type="checkbox"
+                  checked={form.isPublic}
+                  onChange={(event) =>
+                    updateField(
+                      "isPublic",
+                      event.target.checked,
+                    )
+                  }
+                  className="h-4 w-4 accent-[#C6FF32]"
+                />
+              </label>
+
               <label className="flex items-center justify-between gap-4 rounded-[14px] border border-white/10 px-4 py-4">
                 <div>
                   <p className="text-sm font-bold">Favourite</p>

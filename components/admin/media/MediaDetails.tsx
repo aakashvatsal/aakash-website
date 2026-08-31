@@ -139,7 +139,7 @@ export function MediaDetails({
             )}
 
             <Link
-              href={`/admin/media/${post._id}/edit`}
+              href={`/admin/media/${post._id}`}
               className="inline-flex h-12 items-center justify-center rounded-2xl bg-[#C6FF32] px-6 text-xs font-black uppercase tracking-[0.16em] text-black transition hover:brightness-110"
             >
               Edit media
@@ -693,11 +693,6 @@ export function MediaDetails({
               <Detail
                 label="Media ID"
                 value={post._id}
-              />
-
-              <Detail
-                label="User ID"
-                value={post.userId}
               />
 
               <Detail

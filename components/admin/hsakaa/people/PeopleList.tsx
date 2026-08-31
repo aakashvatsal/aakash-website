@@ -15,7 +15,6 @@ import {
   ShieldCheck,
   ShieldQuestion,
   Trash2,
-  UserRound,
   UsersRound,
 } from "lucide-react";
 
@@ -161,6 +160,10 @@ function matchesSearch(
     person.relationship,
     person.relationshipLabel,
     person.identityStatus,
+    person.organizationName,
+    person.roleTitle,
+    person.department,
+    person.location,
     person.notes,
     person.blockedReason,
     ...emails,
@@ -315,6 +318,10 @@ export function PeopleList({
       archived: people.filter(
         (person) => person.isArchived,
       ).length,
+
+      core: activePeople.filter(
+        (person) => (person.importance ?? 3) >= 4,
+      ).length,
     };
   }, [people]);
 
@@ -335,8 +342,8 @@ export function PeopleList({
       icon: ShieldQuestion,
     },
     {
-      label: "Consent",
-      value: stats.consentGranted,
+      label: "Core / important",
+      value: stats.core,
       icon: CheckCircle2,
     },
     {
@@ -612,7 +619,7 @@ export function PeopleList({
                     event.target.value,
                   )
                 }
-                placeholder="Search names, emails, phones, aliases or tags..."
+                placeholder="Search name, company, role, location, email, phone, alias or tag..."
                 className="min-h-12 w-full rounded-[16px] border border-white/10 bg-[#030608] pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-white/25 focus:border-[#C6FF32]/50"
               />
             </div>
@@ -846,6 +853,10 @@ export function PeopleList({
                         )}
                       </span>
 
+                      <span className="rounded-full border border-[#C6FF32]/15 bg-[#C6FF32]/[0.05] px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#C6FF32]/70">
+                        Importance {person.importance ?? 3}/5
+                      </span>
+
                       {person.isArchived ? (
                         <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-amber-200">
                           Archived
@@ -859,15 +870,25 @@ export function PeopleList({
                       ) : null}
                     </div>
 
-                    {person.preferredName ? (
-                      <p className="mt-1 truncate text-sm text-white/35">
-                        Full name: {person.name}
-                      </p>
-                    ) : person.relationshipLabel ? (
-                      <p className="mt-1 truncate text-sm text-white/35">
-                        {person.relationshipLabel}
-                      </p>
-                    ) : null}
+                    <div className="mt-1 space-y-0.5 text-sm text-white/35">
+                      {person.preferredName ? (
+                        <p className="truncate">Full name: {person.name}</p>
+                      ) : null}
+
+                      {person.roleTitle || person.organizationName ? (
+                        <p className="truncate">
+                          {[person.roleTitle, person.organizationName]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                      ) : person.relationshipLabel ? (
+                        <p className="truncate">{person.relationshipLabel}</p>
+                      ) : null}
+
+                      {person.location ? (
+                        <p className="truncate">{person.location}</p>
+                      ) : null}
+                    </div>
                   </div>
 
                   <span
@@ -1008,6 +1029,10 @@ export function PeopleList({
                       {formatDate(
                         person.lastAccessedAt,
                       )}
+                    </p>
+
+                    <p className="text-xs text-white/25">
+                      Last interaction: {formatDate(person.lastInteractionAt)}
                     </p>
                   </div>
 

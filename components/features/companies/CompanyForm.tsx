@@ -12,7 +12,6 @@ import {
 import {
   ArrowLeft,
   Plus,
-  Save,
   Trash2,
 } from "lucide-react";
 

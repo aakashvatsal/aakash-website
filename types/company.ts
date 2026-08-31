@@ -26,7 +26,6 @@ export type CompanyStage =
 export type CreateCompanyPayload = Omit<
   Company,
   | "_id"
-  | "userId"
   | "createdAt"
   | "updatedAt"
 >;
@@ -62,7 +61,6 @@ export interface CompanyFounder {
 export interface Company {
   _id: string;
 
-  userId: string;
 
   name: string;
   slug: string;
