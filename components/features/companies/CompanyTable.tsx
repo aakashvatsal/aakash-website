@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -286,9 +287,12 @@ export function CompanyTable({
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
                         {company.logoUrl ? (
-                          <img
+                          <Image
                             src={company.logoUrl}
                             alt={company.name}
+                            width={44}
+                            height={44}
+                            unoptimized
                             className="h-11 w-11 rounded-xl border border-white/10 object-cover"
                           />
                         ) : (

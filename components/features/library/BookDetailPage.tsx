@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import {
@@ -379,12 +380,13 @@ function BookCover({
   return (
     <div className="relative aspect-[2/3] overflow-hidden rounded-[30px] border border-white/10 bg-white/[0.025] shadow-2xl shadow-black/30">
       {book.coverImageUrl ? (
-        <img
-          src={
-            book.coverImageUrl
-          }
+        <Image
+          src={book.coverImageUrl}
           alt={`${book.title} cover`}
-          className="absolute inset-0 h-full w-full object-cover"
+          fill
+          sizes="(max-width: 768px) 55vw, 280px"
+          unoptimized
+          className="object-cover"
         />
       ) : (
         <BookPlaceholder />

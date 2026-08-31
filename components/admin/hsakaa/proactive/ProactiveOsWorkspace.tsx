@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   BellRing,
@@ -85,7 +85,7 @@ export function ProactiveOsWorkspace() {
     [],
   );
 
-  async function loadAll() {
+  const loadAll = useCallback(async () => {
     setLoading("initial");
     setError(null);
     try {
@@ -105,13 +105,13 @@ export function ProactiveOsWorkspace() {
     } finally {
       setLoading(null);
     }
-  }
+  }, []);
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [loadAll]);
 
-  async function refreshSignals() {
+  const refreshSignals = useCallback(async () => {
     const result = await getProactiveSignals({
       status: status === "all" ? undefined : status,
       severity: severity === "all" ? undefined : severity,
@@ -119,14 +119,14 @@ export function ProactiveOsWorkspace() {
       limit: 120,
     });
     setSignals(result.items);
-  }
+  }, [category, severity, status]);
 
   useEffect(() => {
     if (loading === "initial") return;
     void refreshSignals().catch((cause) => {
       setError(cause instanceof Error ? cause.message : "Could not filter signals.");
     });
-  }, [status, severity, category]);
+  }, [loading, refreshSignals]);
 
   async function scan() {
     setLoading("scan");
