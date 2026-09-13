@@ -8,6 +8,8 @@ import {
   completeMediaProduction,
   generateMediaProductionPack,
   updateMediaProductionAsset,
+  getMediaProductionAssetSuggestions,
+  attachMediaProductionLibraryAsset,
 } from "@/lib/api/media";
 import type {
   MediaAsset,
@@ -15,6 +17,7 @@ import type {
   MediaProductionOverview,
   MediaProductionStatus,
   MediaProductionStudioItem,
+  MediaProductionAssetSuggestionGroup,
 } from "@/types/media";
 
 const statusOrder: MediaProductionStatus[] = [
@@ -52,6 +55,7 @@ export function MediaProductionStudioManager({
   const [platform, setPlatform] = useState<MediaPlatform | "all">("all");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<Record<string, string>>({});
+  const [assetSuggestions, setAssetSuggestions] = useState<Record<string, MediaProductionAssetSuggestionGroup["suggestions"]>>({});
 
   const platforms = useMemo(
     () =>
@@ -104,6 +108,38 @@ export function MediaProductionStudioManager({
         : {}),
     });
     return result;
+  }
+
+
+  async function loadAssetSuggestions(publicationId: string) {
+    setBusyId(`${publicationId}:suggestions`);
+    setError("");
+    try {
+      const groups = await getMediaProductionAssetSuggestions(publicationId);
+      setAssetSuggestions((current) => ({
+        ...current,
+        ...Object.fromEntries(groups.map((group) => [group.requirement._id, group.suggestions])),
+      }));
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Could not find Media Library matches.");
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function attachSuggestion(requirementId: string, libraryAssetId: string) {
+    setBusyId(`${requirementId}:attach`);
+    setError("");
+    try {
+      const result = await attachMediaProductionLibraryAsset(requirementId, libraryAssetId);
+      replaceItem(result);
+      setAssetSuggestions((current) => ({ ...current, [requirementId]: [] }));
+      router.refresh();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Could not attach Media Library asset.");
+    } finally {
+      setBusyId("");
+    }
   }
 
   async function updateAsset(
@@ -179,12 +215,15 @@ export function MediaProductionStudioManager({
               asset requirements. Scheduling and publishing remain outside this stage.
             </p>
           </div>
-          <Link
-            href="/admin/hsakaa/chat"
-            className="rounded-xl bg-[#C6FF32] px-4 py-3 text-sm font-black text-black"
-          >
-            Direct production in HSAKAA
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/media/library" className="rounded-xl border border-[#C6FF32]/30 px-4 py-3 text-sm font-black text-[#C6FF32]">Media Library</Link>
+            <Link
+              href="/admin/hsakaa/chat"
+              className="rounded-xl bg-[#C6FF32] px-4 py-3 text-sm font-black text-black"
+            >
+              Direct production in HSAKAA
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -421,8 +460,8 @@ export function MediaProductionStudioManager({
                         <div className="mt-3 space-y-2">
                           {requiredAssets.length ? (
                             requiredAssets.map((asset) => (
+                              <div key={asset._id} className="space-y-2">
                               <div
-                                key={asset._id}
                                 className="flex flex-col gap-3 rounded-xl border border-white/[0.07] p-4 md:flex-row md:items-center md:justify-between"
                               >
                                 <div>
@@ -436,24 +475,59 @@ export function MediaProductionStudioManager({
                                     <div className="mt-2 text-sm text-white/45">{asset.notes}</div>
                                   ) : null}
                                 </div>
-                                <button
-                                  type="button"
-                                  disabled={busyId === asset._id}
-                                  onClick={() =>
-                                    updateAsset(
-                                      item,
-                                      asset,
-                                      asset.status === "ready" ? "planned" : "ready",
-                                    )
-                                  }
-                                  className={
-                                    asset.status === "ready"
-                                      ? "rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/60"
-                                      : "rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black"
-                                  }
-                                >
-                                  {asset.status === "ready" ? "Mark pending" : "Mark ready"}
-                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                  {asset.status !== "ready" ? (
+                                    <button
+                                      type="button"
+                                      disabled={busyId === `${publication._id}:suggestions`}
+                                      onClick={() => loadAssetSuggestions(publication._id)}
+                                      className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-black text-[#C6FF32] disabled:opacity-40"
+                                    >
+                                      Find from library
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    disabled={busyId === asset._id}
+                                    onClick={() =>
+                                      updateAsset(
+                                        item,
+                                        asset,
+                                        asset.status === "ready" ? "planned" : "ready",
+                                      )
+                                    }
+                                    className={
+                                      asset.status === "ready"
+                                        ? "rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/60"
+                                        : "rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/55"
+                                    }
+                                  >
+                                    {asset.status === "ready" ? "Mark pending" : "Manual ready"}
+                                  </button>
+                                </div>
+                              </div>
+                              {assetSuggestions[asset._id]?.length ? (
+                                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                  {assetSuggestions[asset._id].map((candidate) => (
+                                    <button
+                                      key={candidate._id}
+                                      type="button"
+                                      disabled={busyId === `${asset._id}:attach`}
+                                      onClick={() => attachSuggestion(asset._id, candidate._id)}
+                                      className="overflow-hidden rounded-xl border border-white/[0.08] text-left hover:border-[#C6FF32]/30 disabled:opacity-40"
+                                    >
+                                      {candidate.accessUrl && ["image", "thumbnail", "carousel"].includes(candidate.type) ? (
+                                        // eslint-disable-next-line @next/next/no-img-element -- signed/private library URLs are rendered directly.
+                                        <img src={candidate.accessUrl} alt={candidate.role || candidate.originalName || "Library match"} className="aspect-video w-full object-cover" />
+                                      ) : null}
+                                      <div className="p-3">
+                                        <div className="text-xs font-black text-[#C6FF32]">Use this · {Math.round((candidate.matchScore ?? 0) * 100)}% match</div>
+                                        <div className="mt-1 truncate text-sm font-bold">{candidate.role || candidate.originalName || candidate.type}</div>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              ) : null}
                               </div>
                             ))
                           ) : (

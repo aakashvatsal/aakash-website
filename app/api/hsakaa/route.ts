@@ -19,8 +19,6 @@ const VALID_MODES = new Set([
   "Companies",
   "Journal",
   "Library",
-  "Health",
-  "Media",
   "Memory",
 ]);
 

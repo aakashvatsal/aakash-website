@@ -313,14 +313,10 @@ export interface CreateMediaPostPayload {
   isArchived?: boolean;
 }
 
-export type UpdateMediaPostPayload =
-  Partial<CreateMediaPostPayload>;
+export type UpdateMediaPostPayload = Partial<CreateMediaPostPayload>;
 
 export type MediaAccountConnectionStatus =
-  | "not_connected"
-  | "connected"
-  | "needs_reauth"
-  | "error";
+  "not_connected" | "connected" | "needs_reauth" | "error";
 
 export type MediaDeliveryProvider = "auto" | "buffer" | "direct" | "manual";
 
@@ -522,7 +518,15 @@ export interface MediaAsset {
   _id: string;
   contentItemId?: string;
   publicationId?: string;
-  type: "image" | "video" | "audio" | "document" | "thumbnail" | "carousel" | "broll" | "other";
+  type:
+    | "image"
+    | "video"
+    | "audio"
+    | "document"
+    | "thumbnail"
+    | "carousel"
+    | "broll"
+    | "other";
   role?: string;
   productionRequirementKey?: string;
   required: boolean;
@@ -530,10 +534,43 @@ export interface MediaAsset {
   source: MediaSourceType;
   url?: string;
   storageKey?: string;
+  originalName?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  libraryReusable?: boolean;
+  tags?: string[];
+  accessUrl?: string;
   prompt?: string;
   notes?: string;
   status: "planned" | "ready" | "archived";
   isActive?: boolean;
+}
+
+export interface MediaAssetStorageStatus {
+  provider: "s3";
+  configured: boolean;
+  bucket: string | null;
+  region: string;
+  prefix: string;
+  privateObjects: boolean;
+  browserDirectUploads: boolean;
+  serverFilesystemStorage: boolean;
+  serverSideEncryption: string;
+  requiredCorsMethods: string[];
+}
+
+export interface MediaAssetUploadIntent {
+  asset: MediaAsset;
+  upload: {
+    url: string;
+    expiresSeconds: number;
+    requiredHeaders: Record<string, string>;
+  };
+}
+
+export interface MediaProductionAssetSuggestionGroup {
+  requirement: MediaAsset;
+  suggestions: Array<MediaAsset & { matchScore: number }>;
 }
 
 export interface MediaProductionReadiness {
@@ -578,20 +615,11 @@ export interface MediaMigrationStatus {
 }
 
 export type MediaContentMemoryScope =
-  | "content"
-  | "publication"
-  | "rejected_candidate";
+  "content" | "publication" | "rejected_candidate";
 
-export type MediaContentMemoryStatus =
-  | "active"
-  | "rejected"
-  | "archived";
+export type MediaContentMemoryStatus = "active" | "rejected" | "archived";
 
-export type MediaRepetitionRisk =
-  | "low"
-  | "medium"
-  | "high"
-  | "blocked";
+export type MediaRepetitionRisk = "low" | "medium" | "high" | "blocked";
 
 export interface MediaContentSimilarityMatch {
   memoryId?: string;
@@ -681,10 +709,7 @@ export type MediaGenerationRunStatus =
   | "failed";
 
 export type MediaDirectorCandidateStatus =
-  | "generated"
-  | "blocked"
-  | "accepted"
-  | "rejected";
+  "generated" | "blocked" | "accepted" | "rejected";
 
 export interface MediaDirectorPublicationDraft {
   platform: MediaPlatform;
@@ -800,11 +825,7 @@ export type MediaDeliveryStatus =
   | "cancelled";
 
 export type MediaCalendarSlotStatus =
-  | "open"
-  | "reserved"
-  | "scheduled"
-  | "published"
-  | "cancelled";
+  "open" | "reserved" | "scheduled" | "published" | "cancelled";
 
 export interface MediaCalendarCoverage {
   accountId: string;
@@ -872,7 +893,6 @@ export interface UpdateMediaAccountPayload {
   metadata?: Record<string, unknown>;
 }
 
-
 export interface BufferOrganization {
   id: string;
   name?: string | null;
@@ -922,6 +942,73 @@ export interface MediaBufferSyncResult {
   status: MediaBufferStatus;
 }
 
+export interface MediaBufferNormalizedMetrics {
+  impressions?: number;
+  reach?: number;
+  views?: number;
+  engagedViews?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  clicks?: number;
+  followersGained?: number;
+  watchTimeSeconds?: number;
+  averageViewDurationSeconds?: number;
+  engagementRate?: number;
+}
+
+export interface MediaBufferInsights {
+  generatedAt: string;
+  configured: boolean;
+  accounts: number;
+  posts: Array<{
+    accountId: string;
+    platform: MediaPlatform;
+    displayName: string;
+    post: {
+      id: string;
+      text?: string | null;
+      channelId: string;
+      dueAt?: string | null;
+      sentAt?: string | null;
+      externalLink?: string | null;
+      metricsUpdatedAt?: string | null;
+      metrics?: Array<{
+        type: string;
+        name: string;
+        value: number;
+        unit: string;
+      }> | null;
+    };
+    normalized: MediaBufferNormalizedMetrics;
+  }>;
+  failures: Array<{
+    accountId: string;
+    platform: MediaPlatform;
+    displayName: string;
+    error: string;
+  }>;
+  totals: {
+    posts: number;
+    impressions: number;
+    reach: number;
+    views: number;
+    reactions: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    clicks: number;
+    followersGained: number;
+  };
+  policy: {
+    metricsRefreshApproximatelyDaily: boolean;
+    commentsAreCountsOnly: boolean;
+    commentBodiesRemainInEngagementInbox: boolean;
+    personalApiKeyRequiredForMetrics: boolean;
+  };
+}
+
 export type MediaGrowthDimension =
   | "platform"
   | "format"
@@ -952,10 +1039,7 @@ export interface MediaGrowthLearning {
 }
 
 export type MediaGrowthExperimentStatus =
-  | "planned"
-  | "running"
-  | "completed"
-  | "cancelled";
+  "planned" | "running" | "completed" | "cancelled";
 
 export interface MediaGrowthExperiment {
   _id: string;
@@ -1061,16 +1145,11 @@ export type MediaEngagementType =
   | "whatsapp_message";
 
 export type MediaEngagementStatus =
-  | "new"
-  | "open"
-  | "drafted"
-  | "replied"
-  | "ignored"
-  | "archived"
-  | "failed";
+  "new" | "open" | "drafted" | "replied" | "ignored" | "archived" | "failed";
 
 export type MediaEngagementPriority = "low" | "normal" | "high" | "urgent";
-export type MediaEngagementSentiment = "positive" | "neutral" | "negative" | "mixed";
+export type MediaEngagementSentiment =
+  "positive" | "neutral" | "negative" | "mixed";
 export type MediaEngagementIntent =
   | "appreciation"
   | "question"
@@ -1083,11 +1162,7 @@ export type MediaEngagementIntent =
   | "other";
 export type MediaEngagementSource = "api" | "webhook" | "manual";
 export type MediaEngagementReplyMode =
-  | "public"
-  | "private"
-  | "message"
-  | "manual"
-  | "unavailable";
+  "public" | "private" | "message" | "manual" | "unavailable";
 
 export interface MediaEngagementItem {
   _id: string;
@@ -1179,11 +1254,16 @@ export interface MediaEngagementSyncResult {
     upserted: number;
     note?: string;
   }>;
-  failures: Array<{ accountId: string; platform: MediaPlatform; error: string }>;
+  failures: Array<{
+    accountId: string;
+    platform: MediaPlatform;
+    error: string;
+  }>;
 }
 
 export type MediaAutopilotRunType = "daily" | "weekly" | "manual";
-export type MediaAutopilotRunStatus = "running" | "completed" | "partial" | "failed";
+export type MediaAutopilotRunStatus =
+  "running" | "completed" | "partial" | "failed";
 export type MediaAutopilotRecommendationKind =
   | "calendar_gap"
   | "production_gap"
@@ -1197,7 +1277,8 @@ export type MediaAutopilotRecommendationKind =
   | "analytics_gap"
   | "content_candidate";
 export type MediaAutopilotPriority = "urgent" | "high" | "normal" | "low";
-export type MediaAutopilotRecommendationStatus = "open" | "dismissed" | "completed";
+export type MediaAutopilotRecommendationStatus =
+  "open" | "dismissed" | "completed";
 
 export interface MediaAutopilotSettings {
   _id?: string;
@@ -1288,4 +1369,1346 @@ export interface MediaAutopilotOverview {
     antiRepetitionRemainsMandatory: boolean;
     growthLearningsAreEvidenceNotHardRules: boolean;
   };
+}
+
+export type MediaContextPrivacy =
+  "private_only" | "internal_safe" | "public_safe" | "needs_review";
+
+export interface MediaWorldContextItem {
+  id: string;
+  source: string;
+  kind: string;
+  title: string;
+  summary: string;
+  occurredAt: string;
+  privacy: MediaContextPrivacy;
+  significantChange: boolean;
+  publishable: boolean;
+}
+
+export interface MediaWorldCompanyContext {
+  id: string;
+  name: string;
+  roles: string[];
+  industries: string[];
+  products: string[];
+  markets: string[];
+  currentFocus?: string;
+  currentPriorities: string[];
+  principles: string[];
+  targetCustomer?: string;
+  status?: string;
+  stage?: string;
+}
+
+export interface MediaPresenceStrategy {
+  _id?: string;
+  key: string;
+  version: number;
+  northStar: string;
+  positioning: string;
+  knownFor: string[];
+  audiences: Array<{
+    name: string;
+    need: string;
+    desiredPerception: string;
+  }>;
+  narratives: Array<{
+    key: string;
+    title: string;
+    role: string;
+    targetSharePercent: number;
+    companyName?: string;
+    guardrails: string[];
+  }>;
+  platformRoles: Array<{
+    platform: MediaPlatform;
+    role: string;
+    purpose: string;
+    primaryFormats: MediaPostType[];
+    minPostsPerWeek: number;
+    preferredPostsPerWeek: number;
+    maxPostsPerWeek: number;
+    allowSkipDays: boolean;
+  }>;
+  companyBalance: Array<{
+    companyName: string;
+    narrativeRole: string;
+    targetSharePercent: number;
+    guardrails: string[];
+  }>;
+  thirtyDayObjectives: string[];
+  ninetyDayObjectives: string[];
+  reputationGoals: string[];
+  neverBecome: string[];
+  claimsRequiringReview: string[];
+  privacyRules: string[];
+  aiModel: string;
+  aiResponseId?: string;
+  sourceFingerprint: string;
+  generatedAt: string;
+}
+
+export interface MediaVoiceProfile {
+  _id?: string;
+  key: string;
+  version: number;
+  summary: string;
+  principles: string[];
+  sentenceRhythm: string;
+  vocabulary: string;
+  humour: string;
+  profanity: string;
+  technicalDepth: string;
+  emotionalOpenness: string;
+  storytelling: string;
+  doMore: string[];
+  doNot: string[];
+  avoidPhrases: string[];
+  authenticityChecks: string[];
+  confidence: number;
+  sourceSampleCount: number;
+  aiModel: string;
+  aiResponseId?: string;
+  sourceFingerprint: string;
+  generatedAt: string;
+}
+
+export interface MediaPresenceContextOverview {
+  generatedAt: string;
+  windowDays: number;
+  fingerprint: string;
+  coverage: {
+    capturedDays: number;
+    totalItems: number;
+    publicSafe: number;
+    internalSafe: number;
+    needsReview: number;
+    privateOnly: number;
+    sourceCounts: Record<string, number>;
+    missingSources: string[];
+  };
+  companies: MediaWorldCompanyContext[];
+  hsakaa: {
+    latestBrief?: {
+      headline: string;
+      summary: string;
+      opportunities: string[];
+      generatedAt: string;
+    };
+    latestWeeklyReview?: {
+      headline: string;
+      summary: string;
+      lessons: string[];
+      nextWeekPriorities: string[];
+      generatedAt: string;
+    };
+  };
+  publicSafePreview: MediaWorldContextItem[];
+  internalSafePreview: MediaWorldContextItem[];
+  needsReviewPreview: MediaWorldContextItem[];
+  policy: {
+    privateOnlyDetailsExposedToMedia: false;
+    internalSafeMayInspireButNotBePublishedAsFact: true;
+    needsReviewRequiresOwnerApprovalBeforePublicUse: true;
+    publicSafeMayBeUsedAsEvidence: true;
+    companyMetricsExcludedUnlessSeparatelyVerifiedPublicSafe: true;
+    wholeLifeSignalsAreSanitizedInternalSafeCues?: true;
+    directHobbiesAreFirstClassContext?: true;
+    personalOsSectionsAreInspectedWithoutPrivateDetails?: true;
+  };
+}
+
+export interface MediaPresenceOverview {
+  generatedAt: string;
+  strategy: MediaPresenceStrategy | null;
+  voice: MediaVoiceProfile | null;
+  context: MediaPresenceContextOverview;
+  policy: {
+    wholeOsContextEnabled: boolean;
+    privateOnlyDetailsSentToMediaGeneration: boolean;
+    internalSafeCanShapeStrategy: boolean;
+    needsReviewCannotBecomePublicFactWithoutApproval: boolean;
+    publicSafeCanGroundContent: boolean;
+    contentDirectorConsumesPresenceStrategy: boolean;
+    contentDirectorConsumesVoiceProfile: boolean;
+    autonomousPublishingEnabled: boolean;
+  };
+}
+
+export interface MediaWorldContext extends Omit<
+  MediaPresenceContextOverview,
+  "publicSafePreview" | "internalSafePreview" | "needsReviewPreview"
+> {
+  publicSafe: MediaWorldContextItem[];
+  internalSafe: MediaWorldContextItem[];
+  needsReview: MediaWorldContextItem[];
+  privateOnlyCount: number;
+  hobbies?: Array<{
+    id: string;
+    name: string;
+    status: string;
+    intensity: string;
+    currentStageKey?: string;
+    currentStageTitle?: string;
+    nextFocus?: string;
+    weeklyTargetMinutes: number;
+    weeklyMinutes: number;
+    sessionsThisWeek: number;
+    pace?: string;
+    recommendedTodayMinutes: number;
+    updatedAt?: string;
+  }>;
+  personalOsSections?: Array<{
+    source: string;
+    totalItems: number;
+    publicSafe: number;
+    internalSafe: number;
+    needsReview: number;
+    privateOnly: number;
+    latestSafeItems: Array<{
+      id: string;
+      kind: string;
+      title: string;
+      occurredAt: string;
+      privacy: string;
+    }>;
+  }>;
+  recentMedia: Array<{
+    id: string;
+    title: string;
+    thesis?: string;
+    origin: string;
+    contentPillars: string[];
+    createdAt?: string;
+  }>;
+}
+
+export type MediaPublicIdentityPillar =
+  | "builder_operator"
+  | "ideas_thinking"
+  | "learning_experiments"
+  | "building_aakash"
+  | "human_unfiltered";
+
+export interface MediaPlanningOpportunity {
+  key: string;
+  title: string;
+  thesis: string;
+  whyNow: string;
+  sourceSummary: string;
+  evidenceIds: string[];
+  companyName?: string;
+  narrative: string;
+  strategyNarrativeKey: string;
+  topicClusterKey: string;
+  growthIntent:
+    "authority" | "discovery" | "conversion" | "affinity" | "conversation";
+  identityPillar: MediaPublicIdentityPillar;
+  platforms: MediaPlatform[];
+  formats: MediaPostType[];
+  strategicFit: number;
+  novelty: number;
+  evidenceStrength: number;
+  privacy: "public_safe" | "needs_review";
+  usable: boolean;
+}
+
+export interface MediaPlanningStoryArc {
+  key: string;
+  title: string;
+  purpose: string;
+  narrative: string;
+  companyName?: string;
+  durationDays: number;
+  beats: Array<{
+    order: number;
+    title: string;
+    purpose: string;
+    opportunityKey?: string;
+    platforms: MediaPlatform[];
+  }>;
+}
+
+export interface MediaPlanningImageBrief {
+  mode: "none" | "ai_generation" | "real_photo" | "designed_graphic";
+  aspectRatio: string;
+  overlayText: string;
+  prompt: string;
+  description: string;
+  sourceGuidance: string;
+}
+
+export interface MediaPlanningCarouselSlide {
+  slideNumber: number;
+  headline: string;
+  bodyCopy: string;
+  visualType: "ai_image" | "real_photo" | "designed_graphic" | "text_only";
+  imagePrompt: string;
+  visualDescription: string;
+  overlayText: string;
+}
+
+export interface MediaPlanningTimedDirection {
+  at: string;
+  instruction: string;
+}
+
+export interface MediaPlanningVideoPack {
+  fullScript: string;
+  targetDurationSeconds: number;
+  deliveryInstructions: string;
+  cameraInstructions: string;
+  punchIns: MediaPlanningTimedDirection[];
+  broll: MediaPlanningTimedDirection[];
+  onScreenText: MediaPlanningTimedDirection[];
+  musicDirection: string;
+  coverDirection: string;
+}
+
+export interface MediaPlanningStoryFrame {
+  order: number;
+  overlayText: string;
+  spokenText: string;
+  visualDescription: string;
+  captureInstruction: string;
+  interactiveElement: string;
+}
+
+export interface MediaPlanningDailyStory {
+  action: "post" | "skip";
+  time: string;
+  sourceType:
+    | "routine"
+    | "current_work"
+    | "learning"
+    | "hobby"
+    | "personal_growth"
+    | "professional"
+    | "human_moment";
+  sourceEvidenceIds: string[];
+  reason: string;
+  captureBrief: string;
+  frames: MediaPlanningStoryFrame[];
+  executionReady: boolean;
+  readinessIssues: string[];
+}
+
+export interface MediaPlanningYoutubeCommunityPost {
+  action: "post" | "skip";
+  time: string;
+  format: "text" | "image" | "poll";
+  sourceType:
+    | "routine"
+    | "current_work"
+    | "learning"
+    | "hobby"
+    | "personal_growth"
+    | "professional"
+    | "human_moment";
+  sourceEvidenceIds: string[];
+  reason: string;
+  publishCopy: string;
+  imageBrief: MediaPlanningImageBrief;
+  pollQuestion: string;
+  pollOptions: string[];
+  executionReady: boolean;
+  readinessIssues: string[];
+}
+
+export interface MediaPlanningExecution {
+  platform: MediaPlatform;
+  action: "post" | "skip";
+  time: string;
+  format: MediaPostType;
+  formatIntent: string;
+  opportunityKey?: string;
+  storyArcKey?: string;
+  reason: string;
+  whyThisFormat: string;
+  whyThisTime: string;
+  title: string;
+  hook: string;
+  caption: string;
+  script: string;
+  description: string;
+  cta: string;
+  hashtags: string[];
+  slides: string[];
+  coverText: string;
+  thumbnailText: string;
+  pinnedComment: string;
+  storyFollowUp: string;
+  productionNotes: string;
+  publishCopy: string;
+  copyPasteText: string;
+  copyPasteCaption: string;
+  evidenceIds: string[];
+  imageBrief: MediaPlanningImageBrief;
+  carouselSlides: MediaPlanningCarouselSlide[];
+  videoPack: MediaPlanningVideoPack;
+  xThread: string[];
+  whatsappSequence: string[];
+  executionReady: boolean;
+  readinessIssues: string[];
+  estimatedMinutes: number;
+  requiresApproval: boolean;
+}
+
+export interface MediaPlanningEngagementTask {
+  platform: MediaPlatform;
+  time: string;
+  count: number;
+  purpose: string;
+  guidance: string;
+}
+
+export interface MediaPlanningWeekContext {
+  outingStatus: "yes" | "no" | "maybe" | "unknown";
+  outingDetails: string;
+  weekKey: string;
+  capturedAt: string;
+}
+
+export interface MediaPlanningCycle {
+  _id?: string;
+  key: string;
+  startDate: string;
+  endDate: string;
+  timezone: string;
+  learningStage: string;
+  summary: string;
+  opportunities: MediaPlanningOpportunity[];
+  storyArcs: MediaPlanningStoryArc[];
+  weekContext?: MediaPlanningWeekContext;
+  days: Array<{
+    date: string;
+    theme: string;
+    workload: string;
+    executions: MediaPlanningExecution[];
+    instagramStory?: MediaPlanningDailyStory;
+    youtubeCommunity?: MediaPlanningYoutubeCommunityPost;
+    engagement: MediaPlanningEngagementTask[];
+  }>;
+  strategyFingerprint: string;
+  contextFingerprint: string;
+  aiModel: string;
+  aiResponseId?: string;
+  generatedAt: string;
+}
+
+export type MediaPlanningPartialPlan = Partial<
+  Pick<
+    MediaPlanningCycle,
+    | "startDate"
+    | "endDate"
+    | "timezone"
+    | "learningStage"
+    | "summary"
+    | "opportunities"
+    | "storyArcs"
+    | "days"
+  >
+>;
+
+export interface MediaPlanningArchiveItem {
+  date: string;
+  planId: string;
+  generatedAt: string;
+  day: MediaPlanningCycle["days"][number];
+  completion: {
+    total: number;
+    actionable: number;
+    done: number;
+    completionPercent: number;
+    statuses: Record<string, number>;
+  };
+  publication: {
+    plannedPlatforms: MediaPlatform[];
+    publishedPlatforms: MediaPlatform[];
+    publishedCount: number;
+    allPlannedPlatformsPublished: boolean;
+  };
+}
+
+export interface MediaPlanningGenerationJob {
+  jobId: string;
+  status: "generating" | "generated" | "failed";
+  stage: string;
+  progress: number;
+  error: string | null;
+  planId: string | null;
+  planStartDate: string | null;
+  planEndDate: string | null;
+  queuedAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  completedDays: number;
+  totalDays: number;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cachedInputTokens: number;
+    reasoningTokens: number;
+    calls: number;
+    failedCalls: number;
+    retriedCalls: number;
+  };
+  partialPlan: MediaPlanningPartialPlan | null;
+}
+
+export interface MediaPlanningOverview {
+  generatedAt: string;
+  latest: MediaPlanningCycle | null;
+  stalePlanDetected?: boolean;
+  rolling?: {
+    epoch: string;
+    startDate: string;
+    endDate: string;
+    expectedDates: string[];
+    missingDates: string[];
+    canAutoRoll: boolean;
+    freshStartRequired: boolean;
+    needsWeeklyContext: boolean;
+    weekKey: string;
+    weekContext: MediaPlanningWeekContext & { capturedAt: string | null };
+  };
+  presenceReady: boolean;
+  calendarCoverage: Array<{
+    accountId: string;
+    platform: MediaPlatform;
+    displayName: string;
+    horizonDays: number;
+    desiredPublicationsPerWeek: number;
+    requiredSlots: number;
+    assignedSlots: number;
+    openSlots: number;
+    productionGaps: number;
+    coveragePercent: number;
+    covered: boolean;
+  }>;
+  policy: {
+    horizonDays: number;
+    timezone: string;
+    postingEveryDayRequired: boolean;
+    exactPostingTimesRequired: boolean;
+    version?: string;
+    platformNativeCopyRequired: boolean;
+    copyPasteTextRequired?: boolean;
+    copyPasteCaptionRequired?: boolean;
+    completeCarouselPackRequired?: boolean;
+    completeVideoScriptRequired?: boolean;
+    evidenceIdsRequiredForPublicSafeOpportunities?: boolean;
+    unresolvedReadinessIssuesAllowed?: boolean;
+    engagementTasksIncluded: boolean;
+    approvalRequiredBeforeCanonicalAcceptanceOrPublishing: boolean;
+    planningUsesHistoricalAntiRepetitionMemory?: boolean;
+    planningUsesArchivedPlanAntiRepetitionMemory?: boolean;
+    publicFigureGrowthObjective?: boolean;
+    rollingWindow?: {
+      epoch: string;
+      todayPlusFutureDays: number;
+      singleDayRefreshSupported: boolean;
+      archiveRetainsCompletionAndPublicationSignals: boolean;
+      weeklyOutingContextRequired: boolean;
+    };
+    growthObjective?: {
+      targetFollowers: number;
+      currentKnownFollowers: number;
+      remainingToTarget: number;
+      knownPlatforms: string[];
+      unknownPlatforms: string[];
+      mode: "fastest_sustainable";
+      priorities: string[];
+      guardrails: string[];
+    };
+    strategyNarratives?: Array<{
+      key: string;
+      title: string;
+      targetSharePercent: number;
+    }>;
+    sustainableWeeklyCadence?: {
+      longFormVideos: number;
+      shortFormAndCarousels: string;
+      instagramStories: number;
+      youtubeCommunityPosts?: string;
+      linkedinFeedPosts: string;
+      instagramFeedPosts?: string;
+      youtubeFeedPosts?: string;
+      xFeedPosts: string;
+      whatsappPresence: string;
+    };
+    planningUsesDirectHobbiesContext?: boolean;
+    planningInspectsAllPersonalOsSections?: boolean;
+    crossPlatformDerivativesCountAsOneTopicCluster?: boolean;
+    hobbySignalSurfaceCap?: number;
+  };
+}
+
+export type MediaAudienceSignalType =
+  | "question"
+  | "objection"
+  | "agreement"
+  | "problem"
+  | "lead"
+  | "collaboration"
+  | "language"
+  | "content_request";
+
+export interface MediaPerformanceInsight {
+  _id?: string;
+  publicationId: string;
+  contentItemId?: string;
+  platform: MediaPlatform;
+  format: MediaPostType;
+  period: "1_hour" | "24_hours" | "72_hours" | "7_days" | "30_days" | "latest";
+  percentile: number;
+  confidence: number;
+  identityPillar: MediaPublicIdentityPillar;
+  publicFigureSignals: {
+    reach: number;
+    authority: number;
+    affinity: number;
+    engagement: number;
+  };
+  summary: string;
+  whyItWorked: string;
+  whatLimitedIt: string;
+  doMore: string[];
+  doLess: string[];
+  nextExperiment: string;
+  mechanisms: string[];
+  evidence: Record<string, unknown>;
+  generatedAt: string;
+}
+
+export interface MediaAudienceInsight {
+  _id?: string;
+  key: string;
+  type: MediaAudienceSignalType;
+  topic: string;
+  summary: string;
+  platforms: MediaPlatform[];
+  occurrences: number;
+  confidence: number;
+  examples: string[];
+  engagementIds: string[];
+  recommendedContentAngle: string;
+  recommendedPlatforms: string[];
+  highIntent: boolean;
+  generatedAt: string;
+}
+
+export interface MediaLifecycleDueItem {
+  publicationId: string;
+  platform: MediaPlatform;
+  format: MediaPostType;
+  title: string;
+  publishedAt?: string;
+  period: "1_hour" | "24_hours" | "72_hours" | "7_days" | "30_days";
+}
+
+export interface MediaLearningOverview {
+  generatedAt: string;
+  rangeDays: number;
+  lifecycle: {
+    publications: number;
+    dueSnapshots: number;
+    due: MediaLifecycleDueItem[];
+    coverage: Record<string, number>;
+  };
+  performance: MediaPerformanceInsight[];
+  audience: MediaAudienceInsight[];
+  pillarSignals: Array<{
+    pillar: MediaPublicIdentityPillar;
+    samples: number;
+    confidence: number;
+    reach: number;
+    authority: number;
+    affinity: number;
+    engagement: number;
+  }>;
+  policy: {
+    lifecyclePeriods: string[];
+    compareAgainstOwnPlatformFormatBaseline: boolean;
+    learnMechanismNotExactWording: boolean;
+    audienceQuestionsBecomePlanningEvidence: boolean;
+    engagementSendingStillRequiresApproval: boolean;
+    publicFigureLearningUsesReachAuthorityAffinityEngagement: boolean;
+  };
+}
+
+export interface MediaPresencePlatformScore {
+  platform: MediaPlatform;
+  score: number;
+  consistency: number;
+  reachMomentum: number;
+  contentQuality: number;
+  audienceResponse: number;
+  strategicFit: number;
+  dataConfidence: number;
+  rationale: string;
+}
+
+export interface MediaPresenceReview {
+  _id?: string;
+  key: string;
+  windowStart: string;
+  windowEnd: string;
+  overallScore: number;
+  previousScore?: number;
+  scoreDelta: number;
+  dataConfidence: number;
+  platformScores: MediaPresencePlatformScore[];
+  summary: string;
+  wins: string[];
+  risks: string[];
+  focusThisWeek: string[];
+  avoidThisWeek: string[];
+  experiments: string[];
+  planningGuidance: string[];
+  cadenceAdjustments: Array<{
+    platform: MediaPlatform;
+    direction: "increase" | "hold" | "decrease";
+    reason: string;
+  }>;
+  narrativeAdjustments: Array<{
+    narrative: string;
+    direction: "increase" | "hold" | "decrease";
+    reason: string;
+  }>;
+  strategyChangeCandidates: Array<{
+    field: string;
+    proposedChange: string;
+    reason: string;
+    requiresApproval: true;
+  }>;
+  sourceFingerprint: string;
+  aiModel: string;
+  aiResponseId?: string;
+  generatedAt: string;
+}
+
+export interface MediaPresenceOsOverview {
+  generatedAt: string;
+  latest: MediaPresenceReview | null;
+  policy: {
+    weeklyOverlayMayAdaptAutomatically: boolean;
+    coreThirtyNinetyDayStrategyMutatesAutomatically: boolean;
+    largeStrategyChangesRequireApproval: boolean;
+    scoreUsesOwnMeasuredData: boolean;
+    lowDataConfidenceIsShownExplicitly: boolean;
+  };
+}
+
+export type MediaExecutionKind =
+  | "post"
+  | "production"
+  | "engagement"
+  | "manual_publish"
+  | "analytics_review"
+  | "inbound_reply";
+
+export type MediaExecutionStatus =
+  "pending" | "done" | "missed" | "blocked" | "rescheduled" | "skipped";
+
+export interface MediaDailyExecution {
+  _id?: string;
+  key: string;
+  date: string;
+  kind: MediaExecutionKind;
+  status: MediaExecutionStatus;
+  platform?: MediaPlatform;
+  title: string;
+  time?: string;
+  sourceKey?: string;
+  sourceId?: string;
+  plannedCount: number;
+  completedCount: number;
+  instruction?: string;
+  notes?: string;
+  blockedReason?: string;
+  rescheduledTo?: string;
+  completedAt?: string;
+  isActive: boolean;
+}
+
+export interface MediaTodayOverview {
+  generatedAt: string;
+  date: string;
+  timezone: string;
+  presenceScore: {
+    overall: number;
+    delta: number;
+    confidence: number;
+    platforms: MediaPresencePlatformScore[];
+  } | null;
+  plan: { id: string; startDate: string; endDate: string } | null;
+  day: MediaPlanningCycle["days"][number] | null;
+  theme: string;
+  workload: string;
+  totalPlannedMinutes: number;
+  posts: MediaPlanningExecution[];
+  skips: MediaPlanningExecution[];
+  production: Array<{
+    platform: MediaPlatform;
+    time: string;
+    title: string;
+    format: MediaPostType;
+    estimatedMinutes: number;
+    instruction: string;
+  }>;
+  engagement: MediaPlanningEngagementTask[];
+  inboundReplies: MediaEngagementItem[];
+  publishing: MediaPublication[];
+  manualPublishing: MediaPublication[];
+  analyticsDue: MediaLifecycleDueItem[];
+  execution: {
+    tasks: MediaDailyExecution[];
+    carryForward: MediaDailyExecution[];
+    summary: {
+      total: number;
+      actionable: number;
+      done: number;
+      completionPercent: number;
+      counts: Record<string, number>;
+    };
+  };
+  review: {
+    weeklyFocus: string[];
+    weeklyAvoid: string[];
+    strategyChangeCandidates: MediaPresenceReview["strategyChangeCandidates"];
+  };
+  health: {
+    degraded: boolean;
+    issues: string[];
+  };
+  policy: {
+    todayIsSingleOperatingView: boolean;
+    skipIsAValidAction: boolean;
+    exactPlatformCopyComesFromPresencePlan: boolean;
+    outboundEngagementIsGuidanceUntilSpecificExternalTargetsAreAvailable: boolean;
+    inboundRepliesStillRequireApproval: boolean;
+    publishingStillRequiresExistingApprovalFlow: boolean;
+    materialStrategyChangesRequireApproval: boolean;
+    executionProgressIsPersisted: boolean;
+    unfinishedRecentWorkIsCarriedForward: boolean;
+  };
+}
+
+export interface MediaOperationsPlatformHealth {
+  platform: MediaPlatform;
+  status: "ready" | "partial" | "blocked";
+  accountId?: string;
+  accountName?: string;
+  username?: string;
+  connectionStatus: string;
+  deliveryProvider: string;
+  capabilities: Record<string, unknown> | null;
+  automaticDeliveryReady: boolean;
+  manualFallbackReady: boolean;
+  directCredentialConfigured: boolean;
+  buffer: {
+    supported: boolean;
+    connected: boolean;
+    healthy: boolean;
+  };
+  analytics: {
+    applicable: boolean;
+    configured: boolean;
+    mode: string;
+  };
+  engagement: {
+    readConfigured: boolean;
+    writeConfigured: boolean;
+  };
+  issues: string[];
+  actions: string[];
+}
+
+export interface MediaOperationsOverview {
+  generatedAt: string;
+  status: "ready" | "attention" | "blocked";
+  platforms: MediaOperationsPlatformHealth[];
+  queue: {
+    scheduled: number;
+    publishing: number;
+    manualRequired: number;
+    failed: number;
+    overdue: number;
+    retryScheduled: number;
+    exhausted: number;
+    stuckPublishing: number;
+    requiresAttention: number;
+    retryPolicy: {
+      maxAttempts: number;
+      delayMinutes: number;
+      stuckPublishingMinutes: number;
+    };
+  };
+  lifecycle: {
+    measuredPublications: number;
+    dueSnapshots: number;
+    coverage: Record<string, number>;
+  };
+  buffer: {
+    configured: boolean;
+    reachable: boolean;
+    error?: string;
+    supportedPlatforms: MediaPlatform[];
+  };
+  policy: {
+    approvalRequiredBeforePublishing: boolean;
+    approvalRequiredBeforeEngagementReply: boolean;
+    automaticRetriesAreBounded: boolean;
+    ambiguousDirectDeliveryNeverAutoRetries: boolean;
+    bufferHandoffUsesAuthoritativeReconciliation: boolean;
+    manualFallbackIsAllowed: boolean;
+    whatsappStatusRemainsManual: boolean;
+    operationsHealthNeverExposesCredentialValues: boolean;
+  };
+}
+
+export interface MediaOperationsRepairResult {
+  ranAt: string;
+  stuck: {
+    checked: number;
+    bufferManaged: number;
+    manualReview: number;
+  };
+  buffer: {
+    checked: number;
+    published: number;
+    failed: number;
+    pending: number;
+  };
+  policy: {
+    doesNotPublishNewContent: boolean;
+    doesNotSendEngagementReplies: boolean;
+    doesNotBlindlyRetryAmbiguousDirectPublishes: boolean;
+  };
+}
+
+export type MediaLaunchPhase =
+  | "days_1_30_exploration"
+  | "days_31_90_pattern_discovery"
+  | "day_91_plus_compounding";
+
+export interface MediaLaunchProfilePlan {
+  platform: MediaPlatform;
+  objective: string;
+  headline: string;
+  bio: string;
+  linkStrategy: string;
+  profileImageGuidance: string;
+  bannerGuidance: string;
+  pinnedOrFeatured: string[];
+  setupChecklist: string[];
+  applied: boolean;
+  appliedAt?: string;
+}
+
+export interface MediaLaunchExperimentPolicy {
+  experimentSharePercent: number;
+  minimumSamplesBeforeConclusion: number;
+  minimumDistinctFormatsPerWeek: number;
+  minimumDistinctNarrativesPerWeek: number;
+  preserveVoiceOverOptimization: boolean;
+  avoidEarlyWinnerLockIn: boolean;
+}
+
+export interface MediaLaunchState {
+  _id?: string;
+  key: string;
+  status: "draft" | "active" | "paused";
+  startedAt: string;
+  notes: string;
+  profilePlans: MediaLaunchProfilePlan[];
+  experimentPolicy: MediaLaunchExperimentPolicy;
+  aiModel: string;
+  aiResponseId?: string;
+  strategyFingerprint: string;
+  voiceFingerprint: string;
+  generatedAt: string;
+  isActive: boolean;
+}
+
+export interface MediaLaunchOverview {
+  generatedAt: string;
+  state: MediaLaunchState | null;
+  phase: MediaLaunchPhase;
+  dayNumber: number;
+  launchStartedAt: string | null;
+  readiness: {
+    presenceStrategyReady: boolean;
+    voiceProfileReady: boolean;
+    profilePlanReady: boolean;
+    profilesApplied: number;
+    totalProfiles: number;
+    publishingReadyPlatforms: number;
+    blockedPlatforms: number;
+    canPlan: boolean;
+    canPublishEverywhere: boolean;
+  };
+  blockers: string[];
+  policy: {
+    firstThirtyDaysAreExploration: boolean;
+    earlyPerformanceDoesNotRewriteIdentity: boolean;
+    minimumEvidenceBeforeConclusion: number;
+    preserveAakashVoiceOverOptimization: boolean;
+    profileSetupCanBeAppliedManually: boolean;
+    planningCanStartBeforeEveryConnectorIsReady: boolean;
+    publishingStillRequiresExistingApprovalFlow: boolean;
+  };
+}
+
+export interface MediaLaunchBootstrapResult {
+  launch: MediaLaunchState;
+  plan: MediaPlanningCycle;
+}
+
+export type MediaPublicationReviewStatus =
+  "needs_review" | "changes_required" | "approved" | "stale";
+
+export type MediaPreflightCheckStatus = "pass" | "warn" | "block";
+
+export type MediaPreflightCheckCategory =
+  | "completeness"
+  | "production"
+  | "authenticity"
+  | "platform_fit"
+  | "clarity"
+  | "evidence"
+  | "privacy"
+  | "novelty";
+
+export interface MediaPublicationReview {
+  _id: string;
+  publicationId: string;
+  contentItemId: string;
+  platform: MediaPlatform;
+  format: MediaPostType;
+  status: MediaPublicationReviewStatus;
+  overallScore: number;
+  authenticityScore: number;
+  platformFitScore: number;
+  clarityScore: number;
+  evidenceScore: number;
+  privacyScore: number;
+  noveltyScore: number;
+  productionScore: number;
+  checks: Array<{
+    category: MediaPreflightCheckCategory;
+    status: MediaPreflightCheckStatus;
+    title: string;
+    message: string;
+  }>;
+  strengths: string[];
+  changesRequired: string[];
+  sourceFingerprint: string;
+  reviewedProductionVersion: number;
+  presenceStrategyVersion?: number;
+  voiceProfileVersion?: number;
+  generatedAt?: string;
+  approvedAt?: string;
+  ownerNote?: string;
+}
+
+export interface MediaReviewQueueItem {
+  publication: MediaPublication;
+  review: MediaPublicationReview | null;
+  state: "not_reviewed" | MediaPublicationReviewStatus;
+}
+
+export interface MediaReviewOverview {
+  generatedAt: string;
+  items: MediaReviewQueueItem[];
+  summary: {
+    total: number;
+    notReviewed: number;
+    needsReview: number;
+    changesRequired: number;
+    approved: number;
+    stale: number;
+  };
+  policy: {
+    productionReadinessIsNecessaryButNotSufficient: boolean;
+    ownerApprovalRequiredBeforeScheduleOrPublish: boolean;
+    approvedReviewBecomesStaleWhenContentProductionOrAssetsChange: boolean;
+    blockingPrivacyEvidenceNoveltyOrCompletenessChecksCannotBeOverriddenByScheduling: boolean;
+    warningsMayBeApprovedByOwner: boolean;
+  };
+}
+
+export type MediaReleaseCheckStatus = "pass" | "warn" | "block";
+export type MediaReleaseStage =
+  | "intelligence"
+  | "launch"
+  | "planning"
+  | "production"
+  | "review"
+  | "delivery"
+  | "learning"
+  | "integrity";
+
+export interface MediaReleaseCheck {
+  key: string;
+  stage: MediaReleaseStage;
+  title: string;
+  status: MediaReleaseCheckStatus;
+  message: string;
+  action?: string;
+}
+
+export interface MediaReleaseOverview {
+  generatedAt: string;
+  timezone: string;
+  status: "ready" | "attention" | "blocked";
+  releaseCandidateReady: boolean;
+  score: number;
+  blockers: Array<{
+    key: string;
+    title: string;
+    message: string;
+    action?: string;
+  }>;
+  warnings: Array<{
+    key: string;
+    title: string;
+    message: string;
+    action?: string;
+  }>;
+  checks: MediaReleaseCheck[];
+  stages: Array<{
+    stage: MediaReleaseStage;
+    status: "ready" | "attention" | "blocked";
+    passed: number;
+    total: number;
+  }>;
+  snapshot: {
+    today: string;
+    plan: {
+      id: string;
+      startDate: string;
+      endDate: string;
+      days: number;
+    } | null;
+    launchDay: number;
+    launchPhase: string;
+    profilesApplied: number;
+    reviewQueue: {
+      total: number;
+      notReviewed: number;
+      needsReview: number;
+      changesRequired: number;
+      approved: number;
+      stale: number;
+    };
+    operations: {
+      status: "ready" | "attention" | "blocked";
+      queueRequiresAttention: number;
+      dueSnapshots: number;
+    };
+    integrity: {
+      activePublicationsAudited: number;
+      scheduledPublicationsAudited: number;
+      scheduledOrphans: number;
+      orphanedPublications: number;
+      scheduledWithoutFreshApproval: number;
+      scheduledWithPendingRequiredAssets: number;
+      unverifiedLibraryAssets: number;
+      auditCap: {
+        activePublications: number;
+        scheduledPublications: number;
+      };
+    };
+  };
+  policy: {
+    thisAuditNeverPublishesContent: boolean;
+    thisAuditNeverSendsEngagementReplies: boolean;
+    ownerApprovedFreshPreflightIsRequiredForScheduledContent: boolean;
+    everyPlanningDayMustExplicitlyPostOrSkipAllFivePrimaryPlatforms: boolean;
+    safeRepairOnlyReconcilesExistingDeliveryState: boolean;
+    releaseReadinessDoesNotOverridePrivacyOrEvidenceBlocks: boolean;
+  };
+}
+
+export interface MediaReleaseRepairResult {
+  ranAt: string;
+  operations: MediaOperationsRepairResult;
+  overview: MediaReleaseOverview;
+  policy: {
+    doesNotPublishNewContent: boolean;
+    doesNotGenerateNewContent: boolean;
+    doesNotSendEngagementReplies: boolean;
+    doesNotApprovePreflight: boolean;
+    doesNotBlindlyRetryAmbiguousDirectPublishes: boolean;
+  };
+}
+
+export type MediaSocialProfileSyncStatus =
+  "synced" | "not_configured" | "not_supported" | "error";
+
+export type MediaSocialRecommendationStatus =
+  "recommended" | "followed" | "dismissed";
+
+export type MediaSocialRecommendationPriority = "high" | "medium" | "low";
+
+export type MediaSocialRecommendationVerification =
+  "verified" | "unverified" | "manual_required";
+
+export interface MediaSocialProfile {
+  _id: string;
+  accountId: string;
+  platform: MediaPlatform;
+  externalAccountId?: string;
+  displayName?: string;
+  username?: string;
+  headline?: string;
+  bio?: string;
+  profileUrl?: string;
+  profileImageUrl?: string;
+  bannerUrl?: string;
+  websiteUrl?: string;
+  followerCount?: number;
+  followingCount?: number;
+  mediaCount?: number;
+  verified?: boolean;
+  syncStatus: MediaSocialProfileSyncStatus;
+  syncNote?: string;
+  syncedAt?: string;
+  metadata: Record<string, unknown>;
+  isActive: boolean;
+}
+
+export interface MediaSocialFollowing {
+  _id: string;
+  accountId: string;
+  platform: MediaPlatform;
+  identityKey: string;
+  externalProfileId?: string;
+  username?: string;
+  displayName?: string;
+  profileUrl?: string;
+  profileImageUrl?: string;
+  source: string;
+  observedAt: string;
+  isActive: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface MediaSocialRecommendation {
+  _id: string;
+  platform: MediaPlatform;
+  identityKey: string;
+  externalProfileId?: string;
+  username?: string;
+  displayName: string;
+  profileUrl?: string;
+  profileImageUrl?: string;
+  category: string;
+  whyFollow: string;
+  whatToLearn: string;
+  doNotImitate: string;
+  priority: MediaSocialRecommendationPriority;
+  status: MediaSocialRecommendationStatus;
+  verification: MediaSocialRecommendationVerification;
+  verificationNote?: string;
+  source?: string;
+  firstRecommendedAt: string;
+  lastRecommendedAt: string;
+  actedAt?: string;
+  metadata: Record<string, unknown>;
+  isActive: boolean;
+}
+
+export interface MediaSocialProfileTextAudit {
+  platform: MediaPlatform;
+  verdict: "keep" | "change" | "review";
+  headlineVerdict: "keep" | "change" | "not_applicable";
+  bioVerdict: "keep" | "change" | "not_applicable";
+  linkVerdict: "keep" | "change" | "review" | "not_applicable";
+  bannerVerdict: "keep" | "change" | "review" | "not_applicable";
+  recommendedHeadline: string;
+  recommendedBio: string;
+  recommendedLink: string;
+  reasons: string[];
+  confidence: "low" | "medium" | "high";
+}
+
+export interface MediaSocialProfileImageAudit {
+  inspected: boolean;
+  verdict: "keep" | "change" | "review";
+  summary: string;
+  strengths: string[];
+  improvements: string[];
+  confidence: "low" | "medium" | "high";
+}
+
+export interface MediaSocialPresencePlatformReview {
+  platform: MediaPlatform;
+  connected: boolean;
+  syncStatus: MediaSocialProfileSyncStatus | "missing";
+  current: {
+    displayName: string;
+    username: string;
+    headline: string;
+    bio: string;
+    profileUrl: string;
+    profileImageUrl: string;
+    bannerUrl: string;
+    websiteUrl: string;
+    followerCount: number | null;
+    followingCount: number | null;
+  } | null;
+  launchPlan: MediaLaunchProfilePlan | null;
+  audit: MediaSocialProfileTextAudit;
+  photoAudit: MediaSocialProfileImageAudit;
+  changeRecommended: boolean;
+}
+
+export interface MediaSocialPresenceReview {
+  _id: string;
+  weekOf: string;
+  generatedAt: string;
+  summary: string;
+  platformReviews: MediaSocialPresencePlatformReview[];
+  wins: string[];
+  changesRecommended: string[];
+  networkActions: string[];
+  profileChangesRecommended: number;
+  profilesKept: number;
+  recommendationsActive: number;
+  metadata: Record<string, unknown>;
+}
+
+export interface MediaSocialPresenceAccountOverview {
+  account: MediaAccount;
+  profile: MediaSocialProfile | null;
+  nativeSync: {
+    profileReadConfigured: boolean;
+    networkRead: string;
+    profileWrite: string;
+    followWrite: string;
+    note: string;
+  };
+  observedFollowingCount: number;
+}
+
+export interface MediaSocialPresenceOverview {
+  generatedAt: string;
+  policy: {
+    auditWeeklyChangeRarely: boolean;
+    autoProfileChanges: boolean;
+    autoFollow: boolean;
+    recommendationsRequireHumanAction: boolean;
+    sundayReview: string;
+  };
+  accounts: MediaSocialPresenceAccountOverview[];
+  following: MediaSocialFollowing[];
+  recommendations: MediaSocialRecommendation[];
+  activeRecommendations: MediaSocialRecommendation[];
+  latestReview: MediaSocialPresenceReview | null;
+  reviews: MediaSocialPresenceReview[];
 }

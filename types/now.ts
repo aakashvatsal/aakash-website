@@ -50,6 +50,7 @@ export type NowSource =
   | "health"
   | "whoop"
   | "library"
+  | "hobby"
   | "company"
   | "calendar"
   | "system"

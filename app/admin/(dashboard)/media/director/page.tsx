@@ -22,8 +22,14 @@ export default async function MediaContentDirectorPage() {
         actions={
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/hsakaa/chat"
+              href="/admin/media/presence"
               className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black"
+            >
+              Presence Strategy
+            </Link><Link href="/admin/media/plan" className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]">7-Day Presence Plan</Link>
+            <Link
+              href="/admin/hsakaa/chat"
+              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65"
             >
               Open HSAKAA chat
             </Link>

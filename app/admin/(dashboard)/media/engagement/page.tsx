@@ -16,14 +16,14 @@ export default async function MediaEngagementPage() {
   return (
     <div className="space-y-8">
       <AdminPageHeader
-        eyebrow="Phase 6G · Unified Engagement Inbox"
-        title="Media Engagement"
-        description="Bring comments, mentions, DMs and WhatsApp messages into one queue, let HSAKAA triage and draft responses, and keep every outbound reply explicitly approval-controlled."
+        eyebrow="Media · Conversations"
+        title="Engagement"
+        description="Work only the conversations that deserve your attention. HSAKAA can triage and draft, while meaningful public replies remain approval-controlled."
         actions={
           <div className="flex flex-wrap gap-3">
-            <Link href="/admin/hsakaa/chat" className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black">Ask HSAKAA</Link>
-            <Link href="/admin/media/growth" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65">Growth Analytics</Link>
-            <Link href="/admin/media/calendar" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65">7-Day Calendar</Link>
+            <Link href="/admin/media/today" className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black">Today</Link>
+            <Link href="/admin/media/growth" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65">Performance</Link>
+            <Link href="/admin/media/system" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65">Advanced</Link>
           </div>
         }
       />

@@ -28,6 +28,7 @@ import {
   LayoutDashboard,
   Loader2,
   MessageCircle,
+  Music2,
   Network,
   Search,
   ShieldCheck,
@@ -83,9 +84,29 @@ const navigation: NavigationItem[] = [
     icon: HeartPulse,
     children: [
       {
-        title: "Overview",
+        title: "Today",
         href: "/admin/health",
         icon: HeartPulse,
+      },
+      {
+        title: "AI Plan",
+        href: "/admin/health/plan",
+        icon: Bot,
+      },
+      {
+        title: "Gym",
+        href: "/admin/health/gym",
+        icon: Activity,
+      },
+      {
+        title: "Progress",
+        href: "/admin/health/progress",
+        icon: TrendingUp,
+      },
+      {
+        title: "Attention",
+        href: "/admin/health/attention",
+        icon: BellRing,
       },
       {
         title: "Diet",
@@ -134,51 +155,51 @@ const navigation: NavigationItem[] = [
     icon: Radio,
     children: [
       {
-        title: "Overview",
-        href: "/admin/media",
-        icon: Radio,
+        title: "Today",
+        href: "/admin/media/today",
+        icon: Clock3,
       },
       {
-        title: "Content Director",
-        href: "/admin/media/director",
-        icon: Bot,
+        title: "7-Day Plan",
+        href: "/admin/media/plan",
+        icon: CalendarDays,
       },
       {
-        title: "Production Studio",
+        title: "Create / Production",
         href: "/admin/media/production",
         icon: Clapperboard,
       },
       {
-        title: "7-Day Calendar",
-        href: "/admin/media/calendar",
-        icon: CalendarDays,
-      },
-      {
-        title: "Growth Analytics",
-        href: "/admin/media/growth",
-        icon: TrendingUp,
-      },
-      {
-        title: "Engagement Inbox",
+        title: "Engagement",
         href: "/admin/media/engagement",
         icon: MessageCircle,
       },
       {
-        title: "Growth Autopilot",
-        href: "/admin/media/autopilot",
-        icon: Bot,
+        title: "Performance",
+        href: "/admin/media/growth",
+        icon: TrendingUp,
       },
       {
-        title: "Media Core",
-        href: "/admin/media/core",
-        icon: Radio,
+        title: "Network",
+        href: "/admin/media/network",
+        icon: Network,
       },
       {
-        title: "Content Memory",
-        href: "/admin/media/intelligence",
-        icon: Brain,
+        title: "Library",
+        href: "/admin/media/library",
+        icon: BookOpen,
+      },
+      {
+        title: "Advanced",
+        href: "/admin/media/system",
+        icon: Settings,
       },
     ],
+  },
+  {
+    title: "Hobbies",
+    href: "/admin/hobbies",
+    icon: Music2,
   },
   {
     title: "Now",

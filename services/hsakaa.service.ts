@@ -1504,3 +1504,120 @@ export function reassessPrivateHsakaaDecision(
   );
 }
 
+
+export type HsakaaVerifiedPerson = {
+  id: string;
+  name: string;
+  memoryAccessConsentGranted: boolean;
+};
+
+export type HsakaaPersonSessionResponse = {
+  verified: true;
+  person: HsakaaVerifiedPerson;
+  sessionExpiresAt?: string;
+};
+
+export async function requestHsakaaPersonOtp(identifier: string) {
+  const response = await fetch("/api/hsakaa/person/request-otp", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ identifier }),
+  });
+
+  const payload = await readJson<{
+    message: string;
+    verificationSessionId: string;
+  }>(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.message || "Could not start verification.");
+  }
+
+  if (!payload?.verificationSessionId) {
+    throw new Error("Verification returned an invalid response.");
+  }
+
+  return payload as {
+    message: string;
+    verificationSessionId: string;
+  };
+}
+
+export async function verifyHsakaaPersonOtp(
+  verificationSessionId: string,
+  otp: string,
+) {
+  const response = await fetch("/api/hsakaa/person/verify-otp", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ verificationSessionId, otp }),
+  });
+
+  const payload = await readJson<HsakaaPersonSessionResponse>(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.message || "Verification failed.");
+  }
+
+  if (!payload?.verified || !payload.person?.id || !payload.person.name) {
+    throw new Error("Verification returned an invalid response.");
+  }
+
+  return payload as HsakaaPersonSessionResponse;
+}
+
+export async function getHsakaaPersonSession() {
+  const response = await fetch("/api/hsakaa/person/session", {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+
+  if (response.status === 401) {
+    return null;
+  }
+
+  const payload = await readJson<HsakaaPersonSessionResponse>(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.message || "Could not restore verification.");
+  }
+
+  return payload?.verified ? (payload as HsakaaPersonSessionResponse) : null;
+}
+
+export async function logoutHsakaaPerson() {
+  await fetch("/api/hsakaa/person/logout", {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+}
+
+export async function askVerifiedPersonHsakaa(data: HsakaaChatRequest) {
+  const response = await fetch("/api/hsakaa/person/ask", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  const payload = await readJson<HsakaaChatResponse>(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.message || "Aakash request failed.");
+  }
+
+  if (!payload?.answer || !payload.conversationId) {
+    throw new Error("Aakash returned an invalid response.");
+  }
+
+  return payload as HsakaaChatResponse;
+}

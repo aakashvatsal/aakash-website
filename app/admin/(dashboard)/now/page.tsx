@@ -1,13 +1,16 @@
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { NowForm } from "@/components/admin/now/NowForm";
+import { HobbyNowCard } from "@/components/admin/hobbies/HobbyNowCard";
 import { getNowStatus } from "@/lib/api/now";
+import { getHobbiesOverview } from "@/lib/api/hobbies";
 
 export default async function AdminNowPage() {
   let status = null;
+  let hobbies = null;
   let error: string | null = null;
 
   try {
-    status = await getNowStatus();
+    [status, hobbies] = await Promise.all([getNowStatus(), getHobbiesOverview()]);
   } catch (err) {
     error =
       err instanceof Error
@@ -15,7 +18,6 @@ export default async function AdminNowPage() {
         : "Failed to load current status.";
   }
 
-  console.log("status", status);
 
   return (
     <div className="space-y-8">
@@ -30,7 +32,10 @@ export default async function AdminNowPage() {
           {error}
         </div>
       ) : (
-        <NowForm status={status} />
+        <>
+          <NowForm status={status} />
+          <HobbyNowCard overview={hobbies} />
+        </>
       )}
     </div>
   );

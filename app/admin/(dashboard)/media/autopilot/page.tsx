@@ -17,8 +17,11 @@ export default async function MediaAutopilotPage() {
         title="Proactive HSAKAA"
         description="Keep the rolling calendar ahead, surface production and publishing blockers, turn growth evidence and audience signals into next actions, and proactively draft gap-filling candidates without allowing autonomous acceptance, scheduling, publishing or replies."
         actions={
-          <div className="flex flex-wrap gap-3">
-            <Link href="/admin/hsakaa/chat" className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black">
+          <div className="flex flex-wrap gap-3"><Link href="/admin/media/today" className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black">Today</Link>
+            <Link href="/admin/media/presence" className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black">
+              Presence Strategy
+            </Link><Link href="/admin/media/plan" className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]">7-Day Presence Plan</Link>
+            <Link href="/admin/hsakaa/chat" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65">
               Ask HSAKAA
             </Link>
             <Link href="/admin/media/calendar" className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65">

@@ -78,8 +78,8 @@ export function EnterHsakaa() {
           </h2>
 
           <p className="mx-auto mt-10 max-w-2xl text-xl leading-9 text-white/55">
-            I’m trying to find out. HSAKAA is my AI twin — trained on my work,
-            books, companies, routines, decisions and thinking.
+            I’m trying to find out. Ask me about my work, books, companies,
+            decisions, memories and the way I think.
           </p>
 
           <form
@@ -99,7 +99,7 @@ export function EnterHsakaa() {
                 )
               }
               className="w-full rounded-[28px] border border-white/10 bg-[#030608] px-6 py-5 text-lg outline-none placeholder:text-white/25"
-              placeholder="Ask HSAKAA anything..."
+              placeholder="Ask me something..."
             />
 
             <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -145,7 +145,7 @@ export function EnterHsakaa() {
               }}
               className="mt-6 w-full py-4"
             >
-              Enter HSAKAA
+              Chat with me
               <ArrowRight className="ml-2 h-4 w-4" />
             </MotionButton>
           </form>

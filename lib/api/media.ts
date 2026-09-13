@@ -11,12 +11,9 @@ import type {
   UpdateMediaPostPayload,
 } from "@/types/media";
 
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  "http://localhost:4000/api/v1";
+const API_URL = process.env.BACKEND_API_URL ?? "http://localhost:4000/api/v1";
 
-const ADMIN_API_URL =
-  "/api/admin/backend";
+const ADMIN_API_URL = "/api/admin/backend";
 
 interface ApiErrorResponse {
   message?: string | string[];
@@ -24,122 +21,59 @@ interface ApiErrorResponse {
   error?: string;
 }
 
-function getErrorMessage(
-  payload: ApiErrorResponse,
-): string {
-  if (
-    Array.isArray(
-      payload.message,
-    )
-  ) {
-    return payload.message.join(
-      ", ",
-    );
+function getErrorMessage(payload: ApiErrorResponse): string {
+  if (Array.isArray(payload.message)) {
+    return payload.message.join(", ");
   }
 
-  return (
-    payload.message ??
-    payload.error ??
-    "Something went wrong."
-  );
+  return payload.message ?? payload.error ?? "Something went wrong.";
 }
 
-async function parseResponse<T>(
-  response: Response,
-): Promise<T> {
+async function parseResponse<T>(response: Response): Promise<T> {
   let payload: unknown;
 
   try {
-    payload =
-      await response.json();
+    payload = await response.json();
   } catch {
-    throw new Error(
-      `Invalid API response with status ${response.status}.`,
-    );
+    throw new Error(`Invalid API response with status ${response.status}.`);
   }
 
   if (!response.ok) {
-    throw new Error(
-      getErrorMessage(
-        payload as ApiErrorResponse,
-      ),
-    );
+    throw new Error(getErrorMessage(payload as ApiErrorResponse));
   }
 
   return payload as T;
 }
 
-function buildQuery(
-  filters: MediaFilters,
-): string {
-  const params =
-    new URLSearchParams();
+function buildQuery(filters: MediaFilters): string {
+  const params = new URLSearchParams();
 
-  if (
-    filters.search?.trim()
-  ) {
-    params.set(
-      "search",
-      filters.search.trim(),
-    );
+  if (filters.search?.trim()) {
+    params.set("search", filters.search.trim());
   }
 
-  if (
-    filters.platform
-  ) {
-    params.set(
-      "platform",
-      filters.platform,
-    );
+  if (filters.platform) {
+    params.set("platform", filters.platform);
   }
 
-  if (
-    filters.status
-  ) {
-    params.set(
-      "status",
-      filters.status,
-    );
+  if (filters.status) {
+    params.set("status", filters.status);
   }
 
-  if (
-    filters.postType
-  ) {
-    params.set(
-      "postType",
-      filters.postType,
-    );
+  if (filters.postType) {
+    params.set("postType", filters.postType);
   }
 
-  if (
-    filters.contentPillar?.trim()
-  ) {
-    params.set(
-      "contentPillar",
-      filters.contentPillar.trim(),
-    );
+  if (filters.contentPillar?.trim()) {
+    params.set("contentPillar", filters.contentPillar.trim());
   }
 
-  if (
-    filters.page
-  ) {
-    params.set(
-      "page",
-      String(
-        filters.page,
-      ),
-    );
+  if (filters.page) {
+    params.set("page", String(filters.page));
   }
 
-  if (
-    filters.limit
-  ) {
-    params.set(
-      "limit",
-      String(
-        filters.limit,
-      ),
-    );
+  if (filters.limit) {
+    params.set("limit", String(filters.limit));
   }
 
   return params.toString();
@@ -155,12 +89,7 @@ function unwrapMediaPost(
         data: MediaPost;
       },
 ): MediaPost {
-  if (
-    typeof result ===
-      "object" &&
-    result !== null &&
-    "data" in result
-  ) {
+  if (typeof result === "object" && result !== null && "data" in result) {
     return result.data;
   }
 
@@ -170,89 +99,60 @@ function unwrapMediaPost(
 export async function createMediaPost(
   payload: CreateMediaPostPayload,
 ): Promise<MediaPost> {
-  const response =
-    await fetch(
-      `${ADMIN_API_URL}/media`,
-      {
-        method: "POST",
+  const response = await fetch(`${ADMIN_API_URL}/media`, {
+    method: "POST",
 
-        credentials:
-          "include",
+    credentials: "include",
 
-        cache: "no-store",
+    cache: "no-store",
 
-        headers: {
-          Accept:
-            "application/json",
+    headers: {
+      Accept: "application/json",
 
-          "Content-Type":
-            "application/json",
-        },
+      "Content-Type": "application/json",
+    },
 
-        body: JSON.stringify(
-          payload,
-        ),
-      },
-    );
+    body: JSON.stringify(payload),
+  });
 
-  const result =
-    await parseResponse<
-      | MediaPost
-      | {
-          status?: number;
-          statusCode?: number;
-          message?: string;
-          data: MediaPost;
-        }
-    >(response);
+  const result = await parseResponse<
+    | MediaPost
+    | {
+        status?: number;
+        statusCode?: number;
+        message?: string;
+        data: MediaPost;
+      }
+  >(response);
 
-  return unwrapMediaPost(
-    result,
-  );
+  return unwrapMediaPost(result);
 }
 
 export async function getMediaPosts(
   filters: MediaFilters = {},
 ): Promise<MediaListResponse> {
-  const query =
-    buildQuery(filters);
+  const query = buildQuery(filters);
 
-  const response =
-    await fetch(
-      `${API_URL}/media${
-        query
-          ? `?${query}`
-          : ""
-      }`,
-      {
-        method: "GET",
+  const response = await fetch(`${API_URL}/media${query ? `?${query}` : ""}`, {
+    method: "GET",
 
-        cache: "no-store",
+    cache: "no-store",
 
-        headers: getAdminBackendHeaders(),
-      },
-    );
+    headers: getAdminBackendHeaders(),
+  });
 
-  const payload =
-    await parseResponse<
-      | MediaListResponse
-      | MediaPost[]
-    >(response);
+  const payload = await parseResponse<MediaListResponse | MediaPost[]>(
+    response,
+  );
 
-  if (
-    Array.isArray(
-      payload,
-    )
-  ) {
+  if (Array.isArray(payload)) {
     return {
       data: payload,
 
       pagination: {
         page: 1,
-        limit:
-          payload.length,
-        total:
-          payload.length,
+        limit: payload.length,
+        total: payload.length,
         totalPages: 1,
       },
     };
@@ -261,19 +161,11 @@ export async function getMediaPosts(
   return {
     ...payload,
 
-    data: Array.isArray(
-      payload.data,
-    )
-      ? payload.data
-      : [],
+    data: Array.isArray(payload.data) ? payload.data : [],
   };
 }
 
-export async function getMediaPostById(
-  id: string,
-): Promise<
-  MediaPost | null
-> {
+export async function getMediaPostById(id: string): Promise<MediaPost | null> {
   // The legacy editor only accepts Mongo ObjectIds. Static Media routes
   // (for example /media/engagement) must never be sent to the legacy API
   // as if their route segment were a MediaPost id.
@@ -281,45 +173,32 @@ export async function getMediaPostById(
     return null;
   }
 
-  const response =
-    await fetch(
-      `${API_URL}/media/${encodeURIComponent(
-        id,
-      )}`,
-      {
-        method: "GET",
+  const response = await fetch(`${API_URL}/media/${encodeURIComponent(id)}`, {
+    method: "GET",
 
-        cache: "no-store",
+    cache: "no-store",
 
-        headers: getAdminBackendHeaders(),
-      },
-    );
+    headers: getAdminBackendHeaders(),
+  });
 
-  if (
-    response.status === 404
-  ) {
+  if (response.status === 404) {
     return null;
   }
 
-  const payload =
-    await parseResponse<
-      | MediaPost
-      | {
-          status?: number;
-          statusCode?: number;
-          message?: string;
-          data: MediaPost;
-        }
-    >(response);
+  const payload = await parseResponse<
+    | MediaPost
+    | {
+        status?: number;
+        statusCode?: number;
+        message?: string;
+        data: MediaPost;
+      }
+  >(response);
 
-  return unwrapMediaPost(
-    payload,
-  );
+  return unwrapMediaPost(payload);
 }
 
-export function isMediaPlatform(
-  value?: string,
-): value is MediaPlatform {
+export function isMediaPlatform(value?: string): value is MediaPlatform {
   return [
     "linkedin",
     "instagram",
@@ -328,14 +207,10 @@ export function isMediaPlatform(
     "facebook",
     "threads",
     "whatsapp",
-  ].includes(
-    value ?? "",
-  );
+  ].includes(value ?? "");
 }
 
-export function isMediaPostStatus(
-  value?: string,
-): value is MediaPostStatus {
+export function isMediaPostStatus(value?: string): value is MediaPostStatus {
   return [
     "idea",
     "draft",
@@ -346,105 +221,75 @@ export function isMediaPostStatus(
     "posted",
     "failed",
     "cancelled",
-  ].includes(
-    value ?? "",
-  );
+  ].includes(value ?? "");
 }
 
 export async function updateMediaPost(
   id: string,
   payload: UpdateMediaPostPayload,
 ): Promise<MediaPost> {
-  const response =
-    await fetch(
-      `${ADMIN_API_URL}/media/${encodeURIComponent(
-        id,
-      )}`,
-      {
-        method: "PATCH",
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
 
-        credentials:
-          "include",
+      credentials: "include",
 
-        cache: "no-store",
+      cache: "no-store",
 
-        headers: {
-          Accept:
-            "application/json",
+      headers: {
+        Accept: "application/json",
 
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify(
-          payload,
-        ),
+        "Content-Type": "application/json",
       },
-    );
 
-  const result =
-    await parseResponse<
-      | MediaPost
-      | {
-          status?: number;
-          statusCode?: number;
-          message?: string;
-          data: MediaPost;
-        }
-    >(response);
-
-  return unwrapMediaPost(
-    result,
+      body: JSON.stringify(payload),
+    },
   );
+
+  const result = await parseResponse<
+    | MediaPost
+    | {
+        status?: number;
+        statusCode?: number;
+        message?: string;
+        data: MediaPost;
+      }
+  >(response);
+
+  return unwrapMediaPost(result);
 }
 
-export async function deleteMediaPost(
-  id: string,
-): Promise<void> {
-  const response =
-    await fetch(
-      `${ADMIN_API_URL}/media/${encodeURIComponent(
-        id,
-      )}`,
-      {
-        method:
-          "DELETE",
+export async function deleteMediaPost(id: string): Promise<void> {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/${encodeURIComponent(id)}`,
+    {
+      method: "DELETE",
 
-        credentials:
-          "include",
+      credentials: "include",
 
-        cache:
-          "no-store",
-      },
-    );
+      cache: "no-store",
+    },
+  );
 
-  if (
-    !response.ok
-  ) {
-    let payload:
-      | ApiErrorResponse
-      | null = null;
+  if (!response.ok) {
+    let payload: ApiErrorResponse | null = null;
 
     try {
-      payload =
-        await response.json();
+      payload = await response.json();
     } catch {
       payload = null;
     }
 
     throw new Error(
       payload
-        ? getErrorMessage(
-            payload,
-          )
+        ? getErrorMessage(payload)
         : `Delete failed with status ${response.status}`,
     );
   }
 }
 
-export function isMediaPostType(
-  value?: string,
-): value is MediaPostType {
+export function isMediaPostType(value?: string): value is MediaPostType {
   return [
     "text",
     "image",
@@ -459,36 +304,52 @@ export function isMediaPostType(
     "whatsapp_message",
     "whatsapp_status",
     "whatsapp_template",
-  ].includes(
-    value ?? "",
-  );
+  ].includes(value ?? "");
 }
 export async function getMediaCoreOverview() {
-  const response = await fetch(`${API_URL}/media/core/overview`, { cache: "no-store", headers: getAdminBackendHeaders() });
+  const response = await fetch(`${API_URL}/media/core/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
   return parseResponse<import("@/types/media").MediaCoreOverview>(response);
 }
 
 export async function getMediaCoreAccounts() {
-  const response = await fetch(`${API_URL}/media/core/accounts`, { cache: "no-store", headers: getAdminBackendHeaders() });
+  const response = await fetch(`${API_URL}/media/core/accounts`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
   return parseResponse<import("@/types/media").MediaAccount[]>(response);
 }
 
 export async function getMediaCoreContent() {
-  const response = await fetch(`${API_URL}/media/core/content`, { cache: "no-store", headers: getAdminBackendHeaders() });
+  const response = await fetch(`${API_URL}/media/core/content`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
   return parseResponse<import("@/types/media").MediaContentItem[]>(response);
 }
 
 export async function getMediaCorePublications() {
-  const response = await fetch(`${API_URL}/media/core/publications`, { cache: "no-store", headers: getAdminBackendHeaders() });
+  const response = await fetch(`${API_URL}/media/core/publications`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
   return parseResponse<import("@/types/media").MediaPublication[]>(response);
 }
 
 export async function getMediaMigrationStatus() {
-  const response = await fetch(`${API_URL}/media/core/migration`, { cache: "no-store", headers: getAdminBackendHeaders() });
+  const response = await fetch(`${API_URL}/media/core/migration`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
   return parseResponse<import("@/types/media").MediaMigrationStatus>(response);
 }
 
-export async function createMediaCoreResource<T>(path: string, payload: unknown): Promise<T> {
+export async function createMediaCoreResource<T>(
+  path: string,
+  payload: unknown,
+): Promise<T> {
   const response = await fetch(`${ADMIN_API_URL}/media/core/${path}`, {
     method: "POST",
     credentials: "include",
@@ -500,7 +361,9 @@ export async function createMediaCoreResource<T>(path: string, payload: unknown)
 }
 
 export async function migrateLegacyMedia() {
-  return createMediaCoreResource<import("@/types/media").MediaMigrationStatus & { migrated: number }>("migration", {});
+  return createMediaCoreResource<
+    import("@/types/media").MediaMigrationStatus & { migrated: number }
+  >("migration", {});
 }
 
 export async function getMediaIntelligenceOverview() {
@@ -508,7 +371,9 @@ export async function getMediaIntelligenceOverview() {
     cache: "no-store",
     headers: getAdminBackendHeaders(),
   });
-  return parseResponse<import("@/types/media").MediaIntelligenceOverview>(response);
+  return parseResponse<import("@/types/media").MediaIntelligenceOverview>(
+    response,
+  );
 }
 
 export async function getMediaContentMemories(limit = 50) {
@@ -524,14 +389,13 @@ export async function backfillMediaIntelligence(payload?: {
   refresh?: boolean;
   includePublications?: boolean;
 }) {
-  return createMediaCoreResource<import("@/types/media").MediaIntelligenceBackfillResult>(
-    "intelligence/backfill",
-    {
-      limit: payload?.limit ?? 100,
-      refresh: payload?.refresh ?? false,
-      includePublications: payload?.includePublications ?? true,
-    },
-  );
+  return createMediaCoreResource<
+    import("@/types/media").MediaIntelligenceBackfillResult
+  >("intelligence/backfill", {
+    limit: payload?.limit ?? 100,
+    refresh: payload?.refresh ?? false,
+    includePublications: payload?.includePublications ?? true,
+  });
 }
 
 export async function getMediaDirectorOverview() {
@@ -598,20 +462,144 @@ export async function rejectMediaDirectorCandidate(
   );
 }
 
+export async function getMediaAssetStorageStatus() {
+  const response = await fetch(`${API_URL}/media/core/asset-library/storage`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaAssetStorageStatus>(
+    response,
+  );
+}
+
+export async function getMediaAssetLibrary(input?: {
+  search?: string;
+  type?: import("@/types/media").MediaAsset["type"];
+  limit?: number;
+}) {
+  const params = new URLSearchParams();
+  if (input?.search?.trim()) params.set("search", input.search.trim());
+  if (input?.type) params.set("type", input.type);
+  if (input?.limit) params.set("limit", String(input.limit));
+  const suffix = params.size ? `?${params.toString()}` : "";
+  const response = await fetch(`${API_URL}/media/core/asset-library${suffix}`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaAsset[]>(response);
+}
+
+export async function createMediaAssetUploadIntent(payload: {
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  type?: import("@/types/media").MediaAsset["type"];
+  role?: string;
+  source?: import("@/types/media").MediaSourceType;
+  tags?: string[];
+  notes?: string;
+}) {
+  return createMediaCoreResource<
+    import("@/types/media").MediaAssetUploadIntent
+  >("asset-library/upload-intent", payload);
+}
+
+export async function completeMediaAssetUpload(assetId: string) {
+  return createMediaCoreResource<import("@/types/media").MediaAsset>(
+    `asset-library/${encodeURIComponent(assetId)}/complete`,
+    {},
+  );
+}
+
+export async function uploadMediaAssetToLibrary(
+  file: File,
+  input?: {
+    role?: string;
+    source?: import("@/types/media").MediaSourceType;
+    tags?: string[];
+    notes?: string;
+  },
+) {
+  const intent = await createMediaAssetUploadIntent({
+    filename: file.name,
+    mimeType: file.type || "application/octet-stream",
+    sizeBytes: file.size,
+    role: input?.role,
+    source: input?.source ?? "real",
+    tags: input?.tags,
+    notes: input?.notes,
+  });
+  const upload = await fetch(intent.upload.url, {
+    method: "PUT",
+    headers: intent.upload.requiredHeaders,
+    body: file,
+  });
+  if (!upload.ok) {
+    throw new Error(
+      `S3 Media upload failed with status ${upload.status}. Check bucket CORS and retry.`,
+    );
+  }
+  return completeMediaAssetUpload(intent.asset._id);
+}
+
+export async function archiveMediaLibraryAsset(assetId: string) {
+  return createMediaCoreResource<import("@/types/media").MediaAsset>(
+    `asset-library/${encodeURIComponent(assetId)}/archive`,
+    {},
+  );
+}
+
+export async function getMediaProductionAssetSuggestions(
+  publicationId: string,
+) {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/production/publications/${encodeURIComponent(publicationId)}/asset-suggestions`,
+    {
+      cache: "no-store",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    },
+  );
+  return parseResponse<
+    import("@/types/media").MediaProductionAssetSuggestionGroup[]
+  >(response);
+}
+
+export async function attachMediaProductionLibraryAsset(
+  requirementAssetId: string,
+  libraryAssetId: string,
+) {
+  return createMediaCoreResource<
+    import("@/types/media").MediaProductionStudioItem & {
+      asset: import("@/types/media").MediaAsset;
+    }
+  >(
+    `production/assets/${encodeURIComponent(requirementAssetId)}/attach-library`,
+    { libraryAssetId },
+  );
+}
+
 export async function getMediaProductionOverview() {
   const response = await fetch(`${API_URL}/media/core/production/overview`, {
     cache: "no-store",
     headers: getAdminBackendHeaders(),
   });
-  return parseResponse<import("@/types/media").MediaProductionOverview>(response);
+  return parseResponse<import("@/types/media").MediaProductionOverview>(
+    response,
+  );
 }
 
 export async function getMediaProductionStudio() {
-  const response = await fetch(`${API_URL}/media/core/production/publications`, {
-    cache: "no-store",
-    headers: getAdminBackendHeaders(),
-  });
-  return parseResponse<import("@/types/media").MediaProductionStudioItem[]>(response);
+  const response = await fetch(
+    `${API_URL}/media/core/production/publications`,
+    {
+      cache: "no-store",
+      headers: getAdminBackendHeaders(),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaProductionStudioItem[]>(
+    response,
+  );
 }
 
 export async function getMediaProductionPack(publicationId: string) {
@@ -619,7 +607,9 @@ export async function getMediaProductionPack(publicationId: string) {
     `${API_URL}/media/core/production/publications/${encodeURIComponent(publicationId)}`,
     { cache: "no-store", headers: getAdminBackendHeaders() },
   );
-  return parseResponse<import("@/types/media").MediaProductionStudioItem>(response);
+  return parseResponse<import("@/types/media").MediaProductionStudioItem>(
+    response,
+  );
 }
 
 export async function generateMediaProductionPack(
@@ -627,7 +617,9 @@ export async function generateMediaProductionPack(
   payload?: { force?: boolean; instructions?: string },
 ) {
   return createMediaCoreResource<
-    import("@/types/media").MediaProductionStudioItem & { alreadyGenerated: boolean }
+    import("@/types/media").MediaProductionStudioItem & {
+      alreadyGenerated: boolean;
+    }
   >(
     `production/publications/${encodeURIComponent(publicationId)}/generate`,
     payload ?? {},
@@ -635,7 +627,9 @@ export async function generateMediaProductionPack(
 }
 
 export async function completeMediaProduction(publicationId: string) {
-  return createMediaCoreResource<import("@/types/media").MediaProductionStudioItem>(
+  return createMediaCoreResource<
+    import("@/types/media").MediaProductionStudioItem
+  >(
     `production/publications/${encodeURIComponent(publicationId)}/complete`,
     {},
   );
@@ -657,7 +651,10 @@ export async function updateMediaProductionAsset(
       method: "PATCH",
       credentials: "include",
       cache: "no-store",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     },
   );
@@ -679,10 +676,10 @@ export async function getMediaCalendarOverview() {
 }
 
 export async function ensureMediaCalendarHorizon() {
-  return createMediaCoreResource<{ created: number; minimumPlanningHorizonDays: number }>(
-    "calendar/ensure",
-    {},
-  );
+  return createMediaCoreResource<{
+    created: number;
+    minimumPlanningHorizonDays: number;
+  }>("calendar/ensure", {});
 }
 
 export async function updateMediaCoreAccount(
@@ -695,7 +692,10 @@ export async function updateMediaCoreAccount(
       method: "PATCH",
       credentials: "include",
       cache: "no-store",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(payload),
     },
   );
@@ -788,6 +788,31 @@ export async function reconcileMediaBufferPublications() {
   }>("buffer/reconcile", {});
 }
 
+export async function getMediaBufferInsights(limit = 20) {
+  const normalized = Math.min(50, Math.max(1, Math.trunc(limit)));
+  const response = await fetch(
+    `${API_URL}/media/core/buffer/insights?limit=${encodeURIComponent(String(normalized))}`,
+    { cache: "no-store", headers: getAdminBackendHeaders() },
+  );
+  return parseResponse<import("@/types/media").MediaBufferInsights>(response);
+}
+
+export async function recalibrateMediaFromBuffer() {
+  return createMediaCoreResource<{
+    generatedAt: string;
+    accounts: import("@/types/media").MediaBufferSyncResult;
+    latest: {
+      attempted: number;
+      synced: string[];
+      failures: Array<{ publicationId: string; error: string }>;
+    };
+    lifecycle: unknown;
+    learning: unknown;
+    adaptation: unknown;
+    insights: import("@/types/media").MediaBufferInsights;
+  }>("buffer/recalibrate", {});
+}
+
 export async function getMediaGrowthOverview(days = 30) {
   const response = await fetch(
     `${API_URL}/media/core/growth/overview?days=${encodeURIComponent(String(days))}`,
@@ -846,7 +871,9 @@ export async function getMediaEngagementOverview(days = 30) {
     `${API_URL}/media/core/engagement/overview?days=${encodeURIComponent(String(days))}`,
     { cache: "no-store", headers: getAdminBackendHeaders() },
   );
-  return parseResponse<import("@/types/media").MediaEngagementOverview>(response);
+  return parseResponse<import("@/types/media").MediaEngagementOverview>(
+    response,
+  );
 }
 
 export async function getMediaEngagementItems(
@@ -862,7 +889,10 @@ export async function getMediaEngagementItems(
   }
   if (filters.search?.trim()) params.set("search", filters.search.trim());
   if (filters.limit !== undefined) {
-    const normalizedLimit = Math.min(300, Math.max(1, Math.trunc(filters.limit)));
+    const normalizedLimit = Math.min(
+      300,
+      Math.max(1, Math.trunc(filters.limit)),
+    );
     params.set("limit", String(normalizedLimit));
   }
   const query = params.toString();
@@ -874,10 +904,9 @@ export async function getMediaEngagementItems(
 }
 
 export async function syncMediaEngagement(limitPerAccount = 100) {
-  return createMediaCoreResource<import("@/types/media").MediaEngagementSyncResult>(
-    "engagement/sync",
-    { limitPerAccount },
-  );
+  return createMediaCoreResource<
+    import("@/types/media").MediaEngagementSyncResult
+  >("engagement/sync", { limitPerAccount });
 }
 
 export async function draftMediaEngagementReply(
@@ -890,7 +919,10 @@ export async function draftMediaEngagementReply(
   );
 }
 
-export async function sendMediaEngagementReply(engagementId: string, text: string) {
+export async function sendMediaEngagementReply(
+  engagementId: string,
+  text: string,
+) {
   return createMediaCoreResource<import("@/types/media").MediaEngagementItem>(
     `engagement/items/${encodeURIComponent(engagementId)}/reply`,
     { text },
@@ -907,7 +939,10 @@ export async function updateMediaEngagementStatus(
       method: "PATCH",
       credentials: "include",
       cache: "no-store",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ status }),
     },
   );
@@ -919,7 +954,9 @@ export async function getMediaAutopilotOverview() {
     cache: "no-store",
     headers: getAdminBackendHeaders(),
   });
-  return parseResponse<import("@/types/media").MediaAutopilotOverview>(response);
+  return parseResponse<import("@/types/media").MediaAutopilotOverview>(
+    response,
+  );
 }
 
 export async function getMediaAutopilotRuns(limit = 20) {
@@ -955,14 +992,22 @@ export async function updateMediaAutopilotSettings(
     >
   >,
 ) {
-  const response = await fetch(`${ADMIN_API_URL}/media/core/autopilot/settings`, {
-    method: "PATCH",
-    credentials: "include",
-    cache: "no-store",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return parseResponse<import("@/types/media").MediaAutopilotSettings>(response);
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/autopilot/settings`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaAutopilotSettings>(
+    response,
+  );
 }
 
 export async function updateMediaAutopilotRecommendation(
@@ -976,9 +1021,426 @@ export async function updateMediaAutopilotRecommendation(
       method: "PATCH",
       credentials: "include",
       cache: "no-store",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({ status }),
     },
   );
   return parseResponse<import("@/types/media").MediaAutopilotRun>(response);
+}
+
+export async function getMediaPresenceOverview() {
+  const response = await fetch(`${API_URL}/media/core/presence/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaPresenceOverview>(response);
+}
+
+export async function getMediaWorldContext(days = 30) {
+  const normalized = Math.min(120, Math.max(7, Math.trunc(days)));
+  const response = await fetch(
+    `${API_URL}/media/core/presence/context?days=${encodeURIComponent(String(normalized))}`,
+    { cache: "no-store", headers: getAdminBackendHeaders() },
+  );
+  return parseResponse<import("@/types/media").MediaWorldContext>(response);
+}
+
+export async function bootstrapMediaPresence(payload?: {
+  force?: boolean;
+  notes?: string;
+}) {
+  return createMediaCoreResource<{
+    strategy: import("@/types/media").MediaPresenceStrategy;
+    voice: import("@/types/media").MediaVoiceProfile;
+    context: import("@/types/media").MediaPresenceContextOverview;
+  }>("presence/bootstrap", payload ?? {});
+}
+
+export async function generateMediaPresenceStrategy(payload?: {
+  force?: boolean;
+  notes?: string;
+}) {
+  return createMediaCoreResource<import("@/types/media").MediaPresenceStrategy>(
+    "presence/strategy/generate",
+    payload ?? {},
+  );
+}
+
+export async function generateMediaVoiceProfile(payload?: {
+  force?: boolean;
+  notes?: string;
+}) {
+  return createMediaCoreResource<import("@/types/media").MediaVoiceProfile>(
+    "presence/voice/generate",
+    payload ?? {},
+  );
+}
+
+export async function getMediaPlanningOverview() {
+  const response = await fetch(`${API_URL}/media/core/planning/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaPlanningOverview>(response);
+}
+
+export async function getMediaPlanningCycles(limit = 12) {
+  const normalized = Math.min(52, Math.max(1, Math.trunc(limit)));
+  const response = await fetch(
+    `${API_URL}/media/core/planning/cycles?limit=${encodeURIComponent(String(normalized))}`,
+    { cache: "no-store", headers: getAdminBackendHeaders() },
+  );
+  return parseResponse<import("@/types/media").MediaPlanningCycle[]>(response);
+}
+
+export async function getMediaPlanningArchive(days = 90) {
+  const normalized = Math.min(365, Math.max(7, Math.trunc(days)));
+  const response = await fetch(
+    `${API_URL}/media/core/planning/archive?days=${encodeURIComponent(String(normalized))}`,
+    { cache: "no-store", headers: getAdminBackendHeaders() },
+  );
+  return parseResponse<import("@/types/media").MediaPlanningArchiveItem[]>(
+    response,
+  );
+}
+
+export async function startMediaPlanningGeneration(payload?: {
+  force?: boolean;
+  startDate?: string;
+  notes?: string;
+  mode?: "week" | "day" | "roll" | "ensure";
+  targetDate?: string;
+  outingStatus?: "yes" | "no" | "maybe" | "unknown";
+  outingDetails?: string;
+}) {
+  return createMediaCoreResource<
+    import("@/types/media").MediaPlanningGenerationJob
+  >("planning/generate-async", payload ?? {});
+}
+
+export async function getMediaPlanningGeneration(jobId: string) {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/planning/generation/${encodeURIComponent(jobId)}`,
+    {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    },
+  );
+  return parseResponse<import("@/types/media").MediaPlanningGenerationJob>(
+    response,
+  );
+}
+
+export async function getLatestMediaPlanningGeneration() {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/planning/generation/latest`,
+    {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    },
+  );
+  return parseResponse<
+    import("@/types/media").MediaPlanningGenerationJob | null
+  >(response);
+}
+
+export async function generateMediaPlanningCycle(payload?: {
+  force?: boolean;
+  startDate?: string;
+  notes?: string;
+  mode?: "week" | "day" | "roll" | "ensure";
+  targetDate?: string;
+  outingStatus?: "yes" | "no" | "maybe" | "unknown";
+  outingDetails?: string;
+}) {
+  return createMediaCoreResource<import("@/types/media").MediaPlanningCycle>(
+    "planning/generate",
+    payload ?? {},
+  );
+}
+
+export async function getMediaLearningOverview(days = 90) {
+  const response = await fetch(
+    `${API_URL}/media/core/learning/overview?days=${encodeURIComponent(String(days))}`,
+    { cache: "no-store", headers: getAdminBackendHeaders() },
+  );
+  return parseResponse<import("@/types/media").MediaLearningOverview>(response);
+}
+
+export async function rebuildMediaLearning(days = 90) {
+  return createMediaCoreResource<{
+    lifecycle: unknown;
+    performance: { analyzed: number };
+    audience: { analyzed: number };
+  }>("learning/rebuild", { days });
+}
+
+export async function rebuildMediaPerformanceLearning(days = 90) {
+  return createMediaCoreResource<{ analyzed: number }>(
+    "learning/performance/rebuild",
+    { days },
+  );
+}
+
+export async function rebuildMediaAudienceLearning(days = 60) {
+  return createMediaCoreResource<{ analyzed: number }>(
+    "learning/audience/rebuild",
+    { days },
+  );
+}
+
+export async function syncMediaLifecycleMetrics() {
+  return createMediaCoreResource<{
+    attempted: number;
+    synced: Array<{ publicationId: string; period: string }>;
+    failures: Array<{ publicationId: string; period: string; error: string }>;
+  }>("growth/lifecycle/sync", {});
+}
+
+export async function getMediaPresenceOsOverview() {
+  const response = await fetch(`${API_URL}/media/core/presence-os/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaPresenceOsOverview>(
+    response,
+  );
+}
+
+export async function adaptMediaPresence(payload?: {
+  force?: boolean;
+  notes?: string;
+}) {
+  return createMediaCoreResource<import("@/types/media").MediaPresenceReview>(
+    "presence-os/adapt",
+    payload ?? {},
+  );
+}
+
+export async function getMediaTodayOverview(date?: string) {
+  const suffix = date ? `?date=${encodeURIComponent(date)}` : "";
+  const response = await fetch(
+    `${API_URL}/media/core/presence-os/today${suffix}`,
+    {
+      cache: "no-store",
+      headers: getAdminBackendHeaders(),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaTodayOverview>(response);
+}
+
+export async function updateMediaExecution(
+  key: string,
+  payload: {
+    status: import("@/types/media").MediaExecutionStatus;
+    completedCount?: number;
+    notes?: string;
+    blockedReason?: string;
+    rescheduledTo?: string;
+  },
+) {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/presence-os/executions/${encodeURIComponent(key)}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaDailyExecution>(response);
+}
+
+export async function getMediaOperationsOverview() {
+  const response = await fetch(`${API_URL}/media/core/operations/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaOperationsOverview>(
+    response,
+  );
+}
+
+export async function repairMediaOperationsSafeState() {
+  return createMediaCoreResource<
+    import("@/types/media").MediaOperationsRepairResult
+  >("operations/repair-safe", {});
+}
+
+export async function getMediaLaunchOverview() {
+  const response = await fetch(`${API_URL}/media/core/launch/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaLaunchOverview>(response);
+}
+
+export async function bootstrapMediaLaunch(payload?: {
+  force?: boolean;
+  startDate?: string;
+  notes?: string;
+}) {
+  return createMediaCoreResource<
+    import("@/types/media").MediaLaunchBootstrapResult
+  >("launch/bootstrap", payload ?? {});
+}
+
+export async function updateMediaLaunchProfile(
+  platform: import("@/types/media").MediaPlatform,
+  applied: boolean,
+) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/launch/profile`, {
+    method: "PATCH",
+    credentials: "include",
+    cache: "no-store",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ platform, applied }),
+  });
+  return parseResponse<import("@/types/media").MediaLaunchState>(response);
+}
+
+export async function getMediaReviewOverview() {
+  const response = await fetch(`${API_URL}/media/core/review/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaReviewOverview>(response);
+}
+
+export async function runMediaPreflightReview(
+  publicationId: string,
+  force = true,
+) {
+  return createMediaCoreResource<
+    import("@/types/media").MediaPublicationReview
+  >(`review/publications/${encodeURIComponent(publicationId)}/run`, { force });
+}
+
+export async function decideMediaPreflightReview(
+  publicationId: string,
+  decision: "approve" | "changes_required",
+  note?: string,
+) {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/review/publications/${encodeURIComponent(publicationId)}/decision`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ decision, note }),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaPublicationReview>(
+    response,
+  );
+}
+
+export async function getMediaReleaseOverview() {
+  const response = await fetch(`${API_URL}/media/core/release/overview`, {
+    cache: "no-store",
+    headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<import("@/types/media").MediaReleaseOverview>(response);
+}
+
+export async function repairMediaReleaseSafeState() {
+  return createMediaCoreResource<
+    import("@/types/media").MediaReleaseRepairResult
+  >("release/repair-safe", {});
+}
+
+export async function getMediaSocialPresenceOverview() {
+  const response = await fetch(
+    `${API_URL}/media/core/social-presence/overview`,
+    {
+      cache: "no-store",
+      headers: getAdminBackendHeaders(),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaSocialPresenceOverview>(
+    response,
+  );
+}
+
+export async function syncMediaSocialPresence(syncNetwork = true) {
+  return createMediaCoreResource<{
+    generatedAt: string;
+    results: unknown[];
+    overview: import("@/types/media").MediaSocialPresenceOverview;
+  }>("social-presence/sync", { syncNetwork });
+}
+
+export async function syncMediaSocialPresenceAccount(
+  accountId: string,
+  syncNetwork = true,
+) {
+  return createMediaCoreResource<unknown>(
+    `social-presence/accounts/${encodeURIComponent(accountId)}/sync`,
+    { syncNetwork },
+  );
+}
+
+export async function refreshMediaSocialRecommendations(force = false) {
+  return createMediaCoreResource<{
+    generatedAt: string;
+    created: number;
+    refreshed?: number;
+    skipped?: string;
+    recommendations: import("@/types/media").MediaSocialRecommendation[];
+  }>("social-presence/recommendations/refresh", { force });
+}
+
+export async function updateMediaSocialRecommendation(
+  recommendationId: string,
+  status: import("@/types/media").MediaSocialRecommendationStatus,
+) {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/social-presence/recommendations/${encodeURIComponent(recommendationId)}`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaSocialRecommendation>(
+    response,
+  );
+}
+
+export async function runMediaSocialPresenceReview(force = true) {
+  return createMediaCoreResource<
+    import("@/types/media").MediaSocialPresenceReview
+  >("social-presence/review/run", { force });
+}
+
+export async function getMediaSocialPresenceOverviewClient() {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/social-presence/overview`,
+    {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    },
+  );
+  return parseResponse<import("@/types/media").MediaSocialPresenceOverview>(
+    response,
+  );
 }

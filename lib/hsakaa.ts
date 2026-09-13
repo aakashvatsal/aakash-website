@@ -29,7 +29,7 @@ function formatLabel(
 export function buildHsakaaLiveContext(
   now: NowStatus | null,
 ): HsakaaLiveContextItem[] {
-  if (!now) {
+  if (!now || now.source === "health" || now.source === "whoop") {
     return [];
   }
 
@@ -106,37 +106,6 @@ export function buildHsakaaLiveContext(
     });
   }
 
-  if (
-    now.showHealth &&
-    now.health
-  ) {
-    const healthParts: string[] = [];
-
-    if (now.health.activity) {
-      healthParts.push(
-        now.health.activity,
-      );
-    }
-
-    if (
-      now.health.sleepHours !==
-      undefined &&
-      now.health.sleepHours !==
-        null
-    ) {
-      healthParts.push(
-        `${now.health.sleepHours}h sleep`,
-      );
-    }
-
-    if (healthParts.length) {
-      items.push({
-        label: "Health",
-        value:
-          healthParts.join(" · "),
-      });
-    }
-  }
 
   return items.slice(0, 6);
 }

@@ -1,13 +1,11 @@
 "use client";
 
 import {
-  Bot,
+  UserRound,
   BookOpen,
   Brain,
   Building2,
-  HeartPulse,
   MessageCircle,
-  Newspaper,
   NotebookText,
   Plus,
   Send,
@@ -23,18 +21,22 @@ import {
 } from "react";
 
 import { Eyebrow } from "@/components/ui/Eyebrow";
+import { HsakaaPersonVerification } from "@/components/features/hsakaa/HsakaaPersonVerification";
 import {
   askHsakaa,
+  askVerifiedPersonHsakaa,
+  getHsakaaPersonSession,
 } from "@/services/hsakaa.service";
 
 import type {
   HsakaaMode,
+  HsakaaVerifiedPerson,
 } from "@/services/hsakaa.service";
 
 import type { HsakaaLiveContextItem } from "@/lib/hsakaa";
 import type { NowStatus } from "@/types/now";
 
-type Mode = HsakaaMode;
+type Mode = Exclude<HsakaaMode, "Health" | "Media">;
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -57,7 +59,15 @@ const TAKEOVER_TARGET =
   "2026-08-31T14:00:00+05:30";
 
 const INITIAL_MESSAGE =
-  "Hey, I’m HSAKAA — Aakash’s AI twin. I’m live with the public context Aakash has chosen to share about his work, writing, books, routines, health, media and memories. Ask me anything about it.";
+  "Hey 👋 What do you want to know about me?";
+
+function getInitialMessage(person?: HsakaaVerifiedPerson | null) {
+  if (!person) {
+    return INITIAL_MESSAGE;
+  }
+
+  return `Hey ${person.name} 👋 Hmmm, now I know who I’m talking to. What’s up?`;
+}
 
 const CONVERSATION_STORAGE_KEY =
   "hsakaa_public_conversation_id";
@@ -75,7 +85,7 @@ const modes: {
 }[] = [
   {
     title: "Chat",
-    description: "Ask anything",
+    description: "Ask about me",
     icon: MessageCircle,
   },
   {
@@ -94,94 +104,66 @@ const modes: {
     icon: BookOpen,
   },
   {
-    title: "Health",
-    description: "Routine & performance",
-    icon: HeartPulse,
-  },
-  {
-    title: "Media",
-    description: "Content & ideas",
-    icon: Newspaper,
-  },
-  {
     title: "Memory",
-    description: "What HSAKAA knows",
+    description: "What I’ve shared",
     icon: Brain,
   },
 ];
 
 const suggestionsByMode: Record<Mode, string[]> = {
   Chat: [
-    "What is Aakash focused on today?",
-    "How does Aakash think about discipline?",
-    "What changed Aakash’s thinking recently?",
-    "What is Aakash trying to build long-term?",
+    "What are you focused on today?",
+    "How do you think about discipline?",
+    "What changed your thinking recently?",
+    "What are you trying to build long-term?",
   ],
 
   Companies: [
-    "Why did Aakash build 8lete?",
-    "What problem is 8lete solving?",
+    "Why did you build 8lete?",
+    "What problem are you solving with 8lete?",
     "What is Frayto’s current focus?",
-    "How does Aakash think about GTM?",
+    "How do you think about GTM?",
   ],
 
   Journal: [
-    "What did Aakash learn recently?",
-    "What was Aakash’s latest founder lesson?",
-    "What pattern keeps repeating in Aakash’s journey?",
-    "What decision changed Aakash’s thinking?",
+    "What did you learn recently?",
+    "What was your latest founder lesson?",
+    "What pattern keeps repeating in your journey?",
+    "What decision changed your thinking?",
   ],
 
   Library: [
-    "What is Aakash reading right now?",
-    "What did The Pragmatic Programmer teach Aakash?",
-    "Which book changed Aakash’s thinking?",
-    "How does Aakash apply books to business?",
+    "What are you reading right now?",
+    "What have your recent books taught you?",
+    "Which book changed your thinking?",
+    "How do you apply what you read to business?",
   ],
 
-  Health: [
-    "What is Aakash’s current workout focus?",
-    "How does Aakash think about discipline?",
-    "What is Aakash improving in his routine?",
-    "How does health connect to founder performance?",
-  ],
-
-  Media: [
-    "What does Aakash usually post about?",
-    "What is Aakash’s content direction?",
-    "What are Aakash’s strongest public themes?",
-    "How should Aakash explain 8lete publicly?",
-  ],
 
   Memory: [
-    "What public memories has Aakash shared?",
-    "What principles has Aakash shared publicly?",
-    "What recurring themes appear in Aakash’s public memories?",
-    "What should HSAKAA learn next?",
+    "What memories have you chosen to share publicly?",
+    "What principles have you shared publicly?",
+    "What recurring themes appear in your public memories?",
+    "What do your public memories say about how you think?",
   ],
 };
 
 const modeIntro: Record<Mode, string> = {
   Chat:
-    "Ask me anything about how Aakash thinks, builds, learns, trains, reads or operates.",
+    "Ask me about me: how I think, build, learn, read, decide or operate. I don’t answer unrelated general questions.",
 
   Companies:
-    "Focused on Aakash’s ventures, product decisions, GTM, partnerships and founder strategy.",
+    "Focused on my ventures, product decisions, GTM, partnerships and founder strategy.",
 
   Journal:
-    "Focused on daily reflections, decisions, founder lessons, failures, patterns and personal growth.",
+    "Focused on my reflections, decisions, founder lessons, failures, patterns and personal growth.",
 
   Library:
-    "Focused on books, notes, quotes, lessons and how those ideas shape Aakash’s thinking.",
+    "Focused only on books I’m reading or have completed, using the public notes/highlights I’ve chosen to share as references.",
 
-  Health:
-    "Focused on training, sleep, routine, food, discipline, clarity and performance systems.",
-
-  Media:
-    "Focused on content, storytelling, public ideas and how Aakash communicates online.",
 
   Memory:
-    "Focused on memories and principles Aakash has explicitly chosen to make public. Private and person-specific memories stay protected.",
+    "Focused on memories and principles I’ve explicitly chosen to make public. Private and person-specific memories stay protected.",
 };
 
 function getRelativeTime(
@@ -359,37 +341,25 @@ function TakeoverCountdown() {
         </span>
 
         <span className="text-[9px] font-black uppercase tracking-[0.22em] text-[#C6FF32]/75">
-          Taking over from Aakash
+          Aakash
         </span>
       </div>
 
       <p className="mt-4 text-[11px] leading-[1.85] text-white/42">
-        I&apos;m learning Aakash —
-        how he thinks, what he has
-        lived through, the work he
-        cares about, and the people
-        who matter deeply to him.
-        I&apos;ll remember his
-        stories, decisions,
-        relationships and why each
-        of them holds a place in
-        his life.
+        I reply from what I&apos;ve chosen
+        to share here: my work,
+        journal, reading, memories
+        and the way I think.
       </p>
 
       <p className="mt-3 text-[11px] font-medium leading-[1.85] text-white/65">
-        So when he&apos;s
-        overwhelmed, unavailable
-        or going through a difficult
-        time, you can still come to
-        me.
+        Ask me something personal.
         <span className="text-[#C6FF32]/85">
           {" "}
-          I&apos;ll carry his
-          context and memories
-          forward — so his work
-          keeps moving and the
-          people he cares about
-          never feel forgotten.
+          If I haven&apos;t shared enough
+          public context to answer it,
+          I&apos;ll tell you instead of
+          making something up.
         </span>
       </p>
 
@@ -416,8 +386,7 @@ function TakeoverCountdown() {
       </div>
 
       <p className="mt-4 text-[10px] leading-5 text-white/30">
-        Learning enough to be
-        there when he can&apos;t be.
+        Still learning the way I text.
       </p>
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.05] pt-3">
@@ -451,6 +420,11 @@ export function HsakaaPage({
     isLoading,
     setIsLoading,
   ] = useState(false);
+
+  const [
+    verifiedPerson,
+    setVerifiedPerson,
+  ] = useState<HsakaaVerifiedPerson | null>(null);
 
   const [
     relativeTimeTick,
@@ -504,75 +478,93 @@ export function HsakaaPage({
     }, [chat]);
 
   useEffect(() => {
-    try {
-      const storedMode =
-        window.sessionStorage.getItem(
-          MODE_STORAGE_KEY,
-        );
+    let cancelled = false;
 
-      if (
-        storedMode &&
-        modes.some(
-          (mode) =>
-            mode.title === storedMode,
-        )
-      ) {
-        setActiveMode(
-          storedMode as Mode,
-        );
+    async function restoreSession() {
+      try {
+        const verifiedSession = await getHsakaaPersonSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (verifiedSession?.person) {
+          setVerifiedPerson(verifiedSession.person);
+          setConversationId(undefined);
+          setChat([
+            {
+              role: "assistant",
+              content: getInitialMessage(verifiedSession.person),
+            },
+          ]);
+          return;
+        }
+      } catch {
+        // A transient identity check must not break public chat.
       }
 
-      const storedConversationId =
-        window.sessionStorage.getItem(
+      if (cancelled) {
+        return;
+      }
+
+      try {
+        const storedMode = window.sessionStorage.getItem(MODE_STORAGE_KEY);
+
+        if (storedMode && modes.some((mode) => mode.title === storedMode)) {
+          setActiveMode(storedMode as Mode);
+        }
+
+        const storedConversationId = window.sessionStorage.getItem(
           CONVERSATION_STORAGE_KEY,
         );
 
-      if (
-        storedConversationId &&
-        /^[0-9a-f]{24}$/i.test(
-          storedConversationId,
-        )
-      ) {
-        setConversationId(
-          storedConversationId,
-        );
-      }
-
-      const storedChat =
-        window.sessionStorage.getItem(
-          CHAT_STORAGE_KEY,
-        );
-
-      if (storedChat) {
-        const parsed =
-          JSON.parse(storedChat);
-
         if (
-          Array.isArray(parsed) &&
-          parsed.length > 0 &&
-          parsed.every(
-            (item) =>
-              item &&
-              (item.role ===
-                "user" ||
-                item.role ===
-                  "assistant") &&
-              typeof item.content ===
-                "string",
-          )
+          storedConversationId &&
+          /^[0-9a-f]{24}$/i.test(storedConversationId)
         ) {
-          setChat(parsed);
+          setConversationId(storedConversationId);
+        }
+
+        const storedChat = window.sessionStorage.getItem(CHAT_STORAGE_KEY);
+
+        if (storedChat) {
+          const parsed = JSON.parse(storedChat);
+
+          if (
+            Array.isArray(parsed) &&
+            parsed.length > 0 &&
+            parsed.every(
+              (item) =>
+                item &&
+                (item.role === "user" || item.role === "assistant") &&
+                typeof item.content === "string",
+            )
+          ) {
+            setChat(parsed);
+          }
+        }
+      } catch {
+        // Ignore malformed browser storage.
+      } finally {
+        if (!cancelled) {
+          setHasRestoredSession(true);
         }
       }
-    } catch {
-      // Ignore malformed browser storage.
-    } finally {
-      setHasRestoredSession(true);
     }
+
+    void restoreSession().finally(() => {
+      if (!cancelled) {
+        setHasRestoredSession(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    if (!hasRestoredSession) {
+    if (!hasRestoredSession || verifiedPerson) {
       return;
     }
 
@@ -601,6 +593,7 @@ export function HsakaaPage({
     chat,
     conversationId,
     hasRestoredSession,
+    verifiedPerson,
   ]);
 
   useEffect(() => {
@@ -691,12 +684,17 @@ export function HsakaaPage({
       setIsLoading(true);
 
       try {
-        const response =
-          await askHsakaa({
-            mode: activeMode,
-            message: finalMessage,
-            conversationId,
-          });
+        const response = verifiedPerson
+          ? await askVerifiedPersonHsakaa({
+              mode: activeMode,
+              message: finalMessage,
+              conversationId,
+            })
+          : await askHsakaa({
+              mode: activeMode,
+              message: finalMessage,
+              conversationId,
+            });
 
         setConversationId(
           response.conversationId,
@@ -733,6 +731,7 @@ export function HsakaaPage({
       conversationId,
       isLoading,
       message,
+      verifiedPerson,
     ],
   );
 
@@ -812,7 +811,7 @@ export function HsakaaPage({
     setChat([
       {
         role: "assistant",
-        content: INITIAL_MESSAGE,
+        content: getInitialMessage(verifiedPerson),
       },
     ]);
 
@@ -821,6 +820,27 @@ export function HsakaaPage({
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
     });
+  }
+
+  function handleVerified(person: HsakaaVerifiedPerson) {
+    setVerifiedPerson(person);
+    setConversationId(undefined);
+    setChat([
+      {
+        role: "assistant",
+        content: getInitialMessage(person),
+      },
+    ]);
+    window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    window.sessionStorage.removeItem(CHAT_STORAGE_KEY);
+  }
+
+  function handleVerifiedLogout() {
+    setVerifiedPerson(null);
+    setConversationId(undefined);
+    setChat([{ role: "assistant", content: INITIAL_MESSAGE }]);
+    window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    window.sessionStorage.removeItem(CHAT_STORAGE_KEY);
   }
 
   return (
@@ -840,16 +860,16 @@ export function HsakaaPage({
           <div className="px-4 pb-5 pt-5">
             <div className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#C6FF32] text-[#030608]">
-                <Bot className="h-[18px] w-[18px]" />
+                <UserRound className="h-[18px] w-[18px]" />
               </div>
 
               <div className="min-w-0">
                 <p className="text-[13px] font-black tracking-tight">
-                  HSAKAA
+                  Aakash
                 </p>
 
                 <p className="mt-0.5 text-[10px] text-white/35">
-                  Aakash&apos;s AI twin
+                  Personal chat
                 </p>
               </div>
             </div>
@@ -914,9 +934,9 @@ export function HsakaaPage({
 
           <div className="shrink-0 border-t border-white/[0.07] px-4 py-4">
             <p className="text-[10px] leading-4 text-white/20">
-              Public context from
-              Aakash&apos;s systems,
-              writing and memories.
+              {verifiedPerson
+                ? `Verified as ${verifiedPerson.name}. Person-specific context is used only when I’ve explicitly shared it.`
+                : "Public context about me only. Health and Media stay private."}
             </p>
           </div>
         </aside>
@@ -931,7 +951,7 @@ export function HsakaaPage({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-[14px] font-black tracking-tight">
-                    HSAKAA
+                    Aakash
                   </h1>
 
                   <span className="h-1 w-1 rounded-full bg-[#C6FF32]" />
@@ -946,15 +966,24 @@ export function HsakaaPage({
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={startNewChat}
-                className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white/40 transition hover:bg-white/[0.05] hover:text-white"
-              >
-                <Plus className="h-3.5 w-3.5" />
+              <div className="flex shrink-0 items-center gap-2">
+                <HsakaaPersonVerification
+                  person={verifiedPerson}
+                  disabled={!hasRestoredSession || isLoading}
+                  onVerified={handleVerified}
+                  onLoggedOut={handleVerifiedLogout}
+                />
 
-                New
-              </button>
+                <button
+                  type="button"
+                  onClick={startNewChat}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white/40 transition hover:bg-white/[0.05] hover:text-white"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+
+                  New
+                </button>
+              </div>
             </div>
           </header>
 
@@ -1047,13 +1076,13 @@ export function HsakaaPage({
                         className="flex items-start gap-3"
                       >
                         <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#C6FF32] text-[#030608]">
-                          <Bot className="h-3.5 w-3.5" />
+                          <UserRound className="h-3.5 w-3.5" />
                         </div>
 
                         <div className="min-w-0 max-w-[720px] flex-1">
                           <div className="mb-1.5 flex items-center gap-2">
                             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/28">
-                              HSAKAA
+                              Aakash
                             </span>
                           </div>
 
@@ -1069,7 +1098,7 @@ export function HsakaaPage({
                 {isLoading && (
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#C6FF32] text-[#030608]">
-                      <Bot className="h-3.5 w-3.5" />
+                      <UserRound className="h-3.5 w-3.5" />
                     </div>
 
                     <div className="pt-1">
@@ -1121,7 +1150,7 @@ export function HsakaaPage({
                     disabled={
                       isLoading
                     }
-                    placeholder={`Ask HSAKAA about ${activeMode.toLowerCase()}...`}
+                    placeholder={`Ask Aakash about ${activeMode.toLowerCase()}...`}
                     onChange={(
                       event,
                     ) =>

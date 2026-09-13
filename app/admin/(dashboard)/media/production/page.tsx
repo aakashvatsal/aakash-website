@@ -16,34 +16,28 @@ export default async function MediaProductionStudioPage() {
   return (
     <div className="space-y-8">
       <AdminPageHeader
-        eyebrow="Phase 6D · Production Studio"
-        title="Production Studio"
-        description="Turn approved HSAKAA content into production-ready scripts, shots, B-roll, carousel direction, thumbnails, asset requirements and review-ready executions without scheduling or publishing."
+        eyebrow="Media · Create"
+        title="Create / Production"
+        description="Use this workspace when a planned item needs real production work: recording, shots, B-roll, carousel assets, thumbnails or final media. Simple text/copy items can stay entirely inside the 7-Day Plan."
         actions={
           <div className="flex flex-wrap gap-3">
             <Link
-              href="/admin/hsakaa/chat"
+              href="/admin/media/plan"
               className="rounded-xl bg-[#C6FF32] px-4 py-2 text-sm font-black text-black"
             >
-              Direct in HSAKAA
+              7-Day Plan
             </Link>
             <Link
-              href="/admin/media/calendar"
-              className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]"
-            >
-              7-Day Calendar
-            </Link>
-            <Link
-              href="/admin/media/director"
+              href="/admin/media/library"
               className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65"
             >
-              Content Director
+              Library
             </Link>
             <Link
-              href="/admin/media/core"
+              href="/admin/media/system"
               className="rounded-xl border border-white/10 px-4 py-2 text-sm font-bold text-white/65"
             >
-              Media Core
+              Advanced
             </Link>
           </div>
         }

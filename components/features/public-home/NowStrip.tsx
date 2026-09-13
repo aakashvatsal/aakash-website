@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { NowStatus } from "@/types/now";
 
@@ -70,69 +70,101 @@ function getRelativeTime(value?: string | Date | null) {
 
 export function NowStrip({ now }: NowStripProps) {
   const pathname = usePathname();
+  const [liveNow, setLiveNow] = useState<NowStatus | null>(now);
   const [, setTimeTick] = useState(0);
 
   useEffect(() => {
+    setLiveNow(now);
+  }, [now]);
+
+  const refreshNow = useCallback(async () => {
+    try {
+      const response = await fetch("/api/now", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const current = (await response.json()) as NowStatus | null;
+      setLiveNow(current);
+    } catch {
+      // Keep the most recent known status when a refresh briefly fails.
+    }
+  }, []);
+
+  useEffect(() => {
     const interval = window.setInterval(() => {
+      void refreshNow();
       setTimeTick((current) => current + 1);
     }, 60_000);
 
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refreshNow();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+
     return () => {
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, []);
+  }, [refreshNow]);
 
   const items = useMemo(() => {
-    if (!now) {
+    if (!liveNow) {
       return [];
     }
 
     const result: Array<[string, string]> = [];
 
-    if (now.activity) {
+    if (liveNow.activity) {
       result.push([
-        formatLabel(now.activityType) || "Activity",
-        now.activity,
+        formatLabel(liveNow.activityType) || "Activity",
+        liveNow.activity,
       ]);
     }
 
-    if (now.currentFocus) {
-      result.push(["Focus", now.currentFocus]);
+    if (liveNow.currentFocus) {
+      result.push(["Focus", liveNow.currentFocus]);
     }
 
-    if (now.building?.projectName || now.building?.companyName) {
+    if (liveNow.building?.projectName || liveNow.building?.companyName) {
       result.push([
         "Building",
-        now.building.projectName ||
-          now.building.companyName ||
-          "",
+        liveNow.building.projectName || liveNow.building.companyName || "",
       ]);
     }
 
-    if (now.reading?.title) {
-      result.push(["Reading", now.reading.title]);
+    if (liveNow.reading?.title) {
+      result.push(["Reading", liveNow.reading.title]);
     }
 
-    if (now.thinking) {
-      result.push(["Thinking", now.thinking]);
+    if (liveNow.thinking) {
+      result.push(["Thinking", liveNow.thinking]);
     }
 
-    if (now.showAvailability && now.availability) {
-      result.push(["Availability", formatLabel(now.availability)]);
+    if (liveNow.showAvailability && liveNow.availability) {
+      result.push(["Availability", formatLabel(liveNow.availability)]);
     }
 
-    if (now.showMood && now.mood) {
-      result.push(["Mood", formatLabel(now.mood)]);
+    if (liveNow.showMood && liveNow.mood) {
+      result.push(["Mood", formatLabel(liveNow.mood)]);
     }
 
-    if (now.showHealth && now.health?.activity) {
-      result.push(["Health", now.health.activity]);
+    if (liveNow.showHealth && liveNow.health?.activity) {
+      result.push(["Health", liveNow.health.activity]);
     }
 
     return result.slice(0, 6);
-  }, [now]);
+  }, [liveNow]);
 
-  if (pathname === "/search" ||
+  if (
+    pathname === "/search" ||
     pathname === "/now" ||
     pathname === "/hsakaa" ||
     pathname.startsWith("/hsakaa/")
@@ -140,7 +172,9 @@ export function NowStrip({ now }: NowStripProps) {
     return null;
   }
 
-  const relativeTime = getRelativeTime(now?.updatedAt);
+  const relativeTime = getRelativeTime(
+    liveNow?.lastActivityAt ?? liveNow?.updatedAt,
+  );
 
   const stripItems = (
     <>
@@ -149,18 +183,13 @@ export function NowStrip({ now }: NowStripProps) {
           key={`${label}-${value}-${index}`}
           className="shrink-0 text-white/55"
         >
-          <span className="font-semibold text-white">{label}:</span>{" "}
-          {value}
+          <span className="font-semibold text-white">{label}:</span> {value}
         </span>
       ))}
 
       <span className="shrink-0 text-white/35">{relativeTime}</span>
     </>
   );
-
-  console.log("NOW:", now);
-console.log("ITEMS:", items);
-console.log("ITEMS LENGTH:", items.length);
 
   return (
     <div className="fixed inset-x-0 bottom-[76px] z-[75] border-y border-white/10 bg-[#030608]/95 backdrop-blur-xl lg:bottom-0">
@@ -171,7 +200,7 @@ console.log("ITEMS LENGTH:", items.length);
           className="relative z-10 flex h-full shrink-0 items-center gap-2 bg-[#030608] pl-4 pr-5"
         >
           <span className="relative flex size-2">
-            {now ? (
+            {liveNow ? (
               <>
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#C6FF32] opacity-50" />
                 <span className="relative inline-flex size-2 rounded-full bg-[#C6FF32]" />
@@ -189,7 +218,7 @@ console.log("ITEMS LENGTH:", items.length);
         </Link>
 
         <div className="min-w-0 flex-1 overflow-hidden">
-          {now && items.length ? (
+          {liveNow && items.length ? (
             <div className="flex w-max animate-now-marquee items-center whitespace-nowrap text-[10px]">
               <div className="flex shrink-0 items-center gap-6 pr-6">
                 {stripItems}
@@ -215,12 +244,9 @@ console.log("ITEMS LENGTH:", items.length);
 
       {/* Desktop */}
       <div className="mx-auto hidden h-11 max-w-[1720px] items-center gap-8 overflow-x-auto whitespace-nowrap px-5 text-xs [scrollbar-width:none] lg:flex [&::-webkit-scrollbar]:hidden">
-        <Link
-          href="/now"
-          className="flex shrink-0 items-center gap-2"
-        >
+        <Link href="/now" className="flex shrink-0 items-center gap-2">
           <span className="relative flex size-2">
-            {now ? (
+            {liveNow ? (
               <>
                 <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#C6FF32] opacity-50" />
                 <span className="relative inline-flex size-2 rounded-full bg-[#C6FF32]" />
@@ -235,7 +261,7 @@ console.log("ITEMS LENGTH:", items.length);
           </span>
         </Link>
 
-        {now && items.length ? (
+        {liveNow && items.length ? (
           <>
             {stripItems}
 
@@ -248,9 +274,7 @@ console.log("ITEMS LENGTH:", items.length);
           </>
         ) : (
           <>
-            <span className="text-white/35">
-              No public status available
-            </span>
+            <span className="text-white/35">No public status available</span>
 
             <Link
               href="/now"

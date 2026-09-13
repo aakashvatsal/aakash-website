@@ -8,10 +8,64 @@ import {
   verifyAdminSessionToken,
 } from "@/lib/admin-auth.server";
 
+export const maxDuration = 600;
+
 const BACKEND_URL =
   process.env.BACKEND_API_URL ??
-  "http://localhost:4000/api/v1";
+  "http://127.0.0.1:4000/api/v1";
 
+function normalizeLocalBackendUrl(value: string) {
+  const url = new URL(value);
+
+  // Nest binds to IPv4 (0.0.0.0). On macOS, Node may resolve localhost
+  // to ::1 first, which can make an otherwise healthy local backend look
+  // unavailable to the Next.js server-side proxy. Keep production URLs intact.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (url.hostname === "localhost" || url.hostname === "::1")
+  ) {
+    url.hostname = "127.0.0.1";
+  }
+
+  return url.toString().replace(/\/$/, "");
+}
+
+function describeFetchFailure(error: unknown) {
+  const baseDetail =
+    error instanceof Error
+      ? error.message
+      : String(error);
+
+  const cause =
+    error instanceof Error &&
+    "cause" in error
+      ? (error as Error & { cause?: unknown }).cause
+      : undefined;
+
+  if (!cause || typeof cause !== "object") {
+    return { detail: baseDetail };
+  }
+
+  const socketCause = cause as {
+    code?: string;
+    errno?: string | number;
+    syscall?: string;
+    address?: string;
+    port?: number;
+    message?: string;
+  };
+
+  return {
+    detail: socketCause.message
+      ? `${baseDetail}: ${socketCause.message}`
+      : baseDetail,
+    code: socketCause.code,
+    errno: socketCause.errno,
+    syscall: socketCause.syscall,
+    address: socketCause.address,
+    port: socketCause.port,
+  };
+}
 
 function buildBackendUrl(
   request: NextRequest,
@@ -23,9 +77,8 @@ function buildBackendUrl(
     );
   }
 
-  const base = BACKEND_URL.replace(
-    /\/$/,
-    "",
+  const base = normalizeLocalBackendUrl(
+    BACKEND_URL,
   );
 
   const target = new URL(
@@ -134,16 +187,44 @@ async function proxyRequest(
       await request.arrayBuffer();
   }
 
-  const response =
-    await fetch(
-      backendUrl,
+  let response: Response;
+  try {
+    response = await fetch(backendUrl, {
+      method,
+      headers,
+      body,
+      cache: "no-store",
+    });
+  } catch (error) {
+    const failure =
+      describeFetchFailure(error);
+
+    console.error(
+      "Admin backend proxy request failed:",
       {
         method,
-        headers,
-        body,
-        cache: "no-store",
+        backendUrl:
+          backendUrl.toString(),
+        ...failure,
       },
     );
+
+    return NextResponse.json(
+      {
+        message:
+          "The backend connection failed while processing this request.",
+        ...(process.env.NODE_ENV !==
+        "production"
+          ? {
+              ...failure,
+              backendTarget:
+                backendUrl.origin,
+            }
+          : {}),
+      },
+      { status: 502 },
+    );
+  }
 
   const responseHeaders =
     new Headers();
