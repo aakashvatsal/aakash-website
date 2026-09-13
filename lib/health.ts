@@ -1,13 +1,10 @@
+import { fetchPublicBackend } from "@/lib/public-backend";
+
 import type {
   HealthDashboard,
   HealthEntry,
   HealthTrendsResponse,
 } from "@/types/health";
-
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
 
 interface ApiErrorResponse {
   status?: number;
@@ -66,90 +63,183 @@ async function parseResponse<T>(
   return payload as T;
 }
 
-export async function getHealthDashboard(): Promise<HealthDashboard> {
-  const response =
-    await fetch(
-      `${API_URL}/health/public/dashboard`,
-      {
-        cache: "no-store",
-      },
-    );
 
-  return parseResponse<HealthDashboard>(
-    response,
-  );
+function getDateKey(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function emptyHealthDashboard(): HealthDashboard {
+  return {
+    today: {
+      dateKey: getDateKey(),
+      recoveryScore: null,
+      strainScore: null,
+      sleepPerformance: null,
+      sleepHours: null,
+      hrvMs: null,
+      restingHeartRateBpm: null,
+      bloodOxygenPercentage: null,
+      respiratoryRate: null,
+      skinTemperatureCelsius: null,
+      sleepConsistencyPercentage: null,
+      sleepEfficiencyPercentage: null,
+      sleepNeedMinutes: null,
+      sleepDebtMinutes: null,
+      workouts: 0,
+      sources: [],
+    },
+    trends: {
+      recovery7DayAverage: null,
+      recovery30DayAverage: null,
+      sleep7DayAverageHours: null,
+      sleep30DayAverageHours: null,
+      strain7DayAverage: null,
+      strain30DayAverage: null,
+      hrv7DayAverage: null,
+      hrv30DayAverage: null,
+      restingHeartRate7DayAverage: null,
+      restingHeartRate30DayAverage: null,
+      recoveryChange: null,
+      sleepChange: null,
+      hrvChange: null,
+      restingHeartRateChange: null,
+      strainChange: null,
+    },
+    body: {
+      latestWeightKg: null,
+      latestBodyFatPercentage: null,
+      latestWaistCm: null,
+      measuredAt: null,
+    },
+    workouts: {
+      last7Days: 0,
+      last30Days: 0,
+      strainLast7Days: null,
+      strainLast30Days: null,
+    },
+    consistency: {
+      trackedDays7: 0,
+      trackedDays30: 0,
+    },
+  };
+}
+
+function emptyHealthTrends(days: number): HealthTrendsResponse {
+  const dateKey = getDateKey();
+
+  return {
+    period: {
+      startDate: dateKey,
+      endDate: dateKey,
+      days,
+    },
+    data: [],
+    averages: {
+      recovery: null,
+      strain: null,
+      sleepHours: null,
+      sleepPerformance: null,
+      hrvMs: null,
+      restingHeartRateBpm: null,
+    },
+  };
+}
+
+export async function getHealthDashboard(): Promise<HealthDashboard> {
+  try {
+    const response =
+      await fetchPublicBackend(
+        "/health/public/dashboard",
+        {
+          cache: "no-store",
+        },
+      );
+
+    return await parseResponse<HealthDashboard>(
+      response,
+    );
+  } catch (error) {
+    console.error("Failed to fetch public health dashboard.", error);
+    return emptyHealthDashboard();
+  }
 }
 
 export async function getHealthTrends(
   days = 30,
 ): Promise<HealthTrendsResponse> {
-  const response =
-    await fetch(
-      `${API_URL}/health/public/trends?days=${days}`,
-      {
-        next: {
-          revalidate: 60,
+  try {
+    const response =
+      await fetchPublicBackend(
+        `/health/public/trends?days=${days}`,
+        {
+          next: {
+            revalidate: 60,
+          },
         },
-      },
-    );
+      );
 
-  return parseResponse<HealthTrendsResponse>(
-    response,
-  );
+    return await parseResponse<HealthTrendsResponse>(
+      response,
+    );
+  } catch (error) {
+    console.error("Failed to fetch public health trends.", error);
+    return emptyHealthTrends(days);
+  }
 }
 
 export async function getLatestHealthEntry(): Promise<HealthEntry | null> {
-  const response =
-    await fetch(
-      `${API_URL}/health/public/latest`,
-      {
-        cache: "no-store",
-      },
-    );
+  try {
+    const response =
+      await fetchPublicBackend(
+        "/health/public/latest",
+        {
+          cache: "no-store",
+        },
+      );
 
-  if (
-    response.status ===
-    404
-  ) {
-    return null;
-  }
+    if (response.status === 404) {
+      return null;
+    }
 
-  const payload =
-    await parseResponse<
-      HealthEntry |
-      HealthItemResponse
-    >(response);
+    const payload =
+      await parseResponse<
+        HealthEntry |
+        HealthItemResponse
+      >(response);
 
-  let entry:
-    | HealthEntry
-    | null =
-    null;
-
-  if (
-    "data" in payload
-  ) {
-    entry =
-      payload.data ??
+    let entry:
+      | HealthEntry
+      | null =
       null;
-  } else {
-    entry =
-      payload as HealthEntry;
-  }
 
-  if (
-    !entry?._id
-  ) {
+    if ("data" in payload) {
+      entry =
+        payload.data ??
+        null;
+    } else {
+      entry =
+        payload as HealthEntry;
+    }
+
+    if (!entry?._id) {
+      return null;
+    }
+
+    if (
+      entry.isActive === false ||
+      entry.isArchived === true
+    ) {
+      return null;
+    }
+
+    return entry;
+  } catch (error) {
+    console.error("Failed to fetch latest public health entry.", error);
     return null;
   }
-
-  if (
-    entry.isActive ===
-      false ||
-    entry.isArchived ===
-      true
-  ) {
-    return null;
-  }
-
-  return entry;
 }

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 
-const API_URL = process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
+import { fetchPublicBackend } from "@/lib/public-backend";
 
 function unwrapNow(payload: unknown) {
   if (payload && typeof payload === "object" && "data" in payload) {
@@ -14,7 +12,7 @@ function unwrapNow(payload: unknown) {
 
 export async function GET() {
   try {
-    const response = await fetch(`${API_URL}/now/public`, {
+    const response = await fetchPublicBackend("/now/public", {
       method: "GET",
       cache: "no-store",
       headers: {

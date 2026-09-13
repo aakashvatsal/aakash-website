@@ -1,8 +1,6 @@
-import type { NowHistoryResponse, NowStatus } from "@/types/now";
+import { fetchPublicBackend } from "@/lib/public-backend";
 
-const API_URL = process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
+import type { NowHistoryResponse, NowStatus } from "@/types/now";
 
 interface ApiErrorResponse {
   status?: number;
@@ -72,7 +70,7 @@ function unwrapData<T>(payload: T | ApiDataResponse<T>): T | null {
 
 export async function getPublicNowStatus(): Promise<NowStatus | null> {
   try {
-    const response = await fetch(`${API_URL}/now/public`, {
+    const response = await fetchPublicBackend("/now/public", {
       cache: "no-store",
       headers: {
         Accept: "application/json",
@@ -110,7 +108,7 @@ export async function getPublicNowStatus(): Promise<NowStatus | null> {
 }
 
 export async function getCurrentNowStatus(): Promise<NowStatus | null> {
-  const response = await fetch(`${API_URL}/now/current`, {
+  const response = await fetchPublicBackend("/now/current", {
     cache: "no-store",
   });
 
@@ -129,34 +127,33 @@ export async function getNowHistory(
   page = 1,
   limit = 20,
 ): Promise<NowHistoryResponse> {
-  const response = await fetch(
-    `${API_URL}/now/public/history?page=${page}&limit=${limit}`,
-    {
-      next: {
-        revalidate: 60,
-      },
+  const emptyHistory: NowHistoryResponse = {
+    data: [],
+    pagination: {
+      page,
+      limit,
+      total: 0,
+      totalPages: 0,
     },
-  );
+  };
 
-  const payload = await parseResponse<
-    NowHistoryResponse | ApiDataResponse<NowHistoryResponse>
-  >(response);
-
-  const data = unwrapData<NowHistoryResponse>(payload);
-
-  return (
-    data ?? {
-      data: [],
-
-      pagination: {
-        page,
-
-        limit,
-
-        total: 0,
-
-        totalPages: 0,
+  try {
+    const response = await fetchPublicBackend(
+      `/now/public/history?page=${page}&limit=${limit}`,
+      {
+        next: {
+          revalidate: 60,
+        },
       },
-    }
-  );
+    );
+
+    const payload = await parseResponse<
+      NowHistoryResponse | ApiDataResponse<NowHistoryResponse>
+    >(response);
+
+    return unwrapData<NowHistoryResponse>(payload) ?? emptyHistory;
+  } catch (error) {
+    console.error("Failed to fetch public Now history.", error);
+    return emptyHistory;
+  }
 }

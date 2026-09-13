@@ -1,13 +1,10 @@
+import { fetchPublicBackend } from "@/lib/public-backend";
+
 import type {
   PublicMediaPost,
   PublicMediaQuery,
   PublicMediaResponse,
 } from "@/types/public-media";
-
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
 
 interface MediaApiResponse {
   data: PublicMediaPost[];
@@ -123,14 +120,14 @@ export async function getMediaPosts(
     limit,
   });
 
-  const endpoint = `${API_URL}/media/public${
+  const endpoint = `/media/public${
     queryString
       ? `?${queryString}`
       : ""
   }`;
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetchPublicBackend(endpoint, {
       method: "GET",
       headers: {
         Accept: "application/json",

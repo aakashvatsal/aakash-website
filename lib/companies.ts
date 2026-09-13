@@ -1,12 +1,9 @@
+import { fetchPublicBackend } from "@/lib/public-backend";
+
 import type {
   Company,
   CompanyListApiResponse,
 } from "@/types/company";
-
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
 
 export async function getCompanies(): Promise<Company[]> {
   const query = new URLSearchParams({
@@ -15,29 +12,35 @@ export async function getCompanies(): Promise<Company[]> {
     isActive: "true",
   });
 
-  const response = await fetch(
-    `${API_URL}/companies/public?${query.toString()}`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
+  try {
+    const response = await fetchPublicBackend(
+      `/companies/public?${query.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Unable to fetch public companies (${response.status}).`,
     );
+
+    if (!response.ok) {
+      console.error("Unable to fetch public companies.", {
+        status: response.status,
+      });
+      return [];
+    }
+
+    const result =
+      (await response.json()) as CompanyListApiResponse;
+
+    return Array.isArray(result.data)
+      ? result.data
+      : [];
+  } catch (error) {
+    console.error("Failed to fetch public companies.", error);
+    return [];
   }
-
-  const result =
-    (await response.json()) as CompanyListApiResponse;
-
-  return Array.isArray(result.data)
-    ? result.data
-    : [];
 }
 
 export async function getCompanyBySlug(
@@ -47,28 +50,38 @@ export async function getCompanyBySlug(
     return null;
   }
 
-  const response = await fetch(
-    `${API_URL}/companies/public/${encodeURIComponent(slug)}`,
-    {
-      method: "GET",
-      headers: {
-        Accept: "application/json",
+  try {
+    const response = await fetchPublicBackend(
+      `/companies/public/${encodeURIComponent(slug)}`,
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        cache: "no-store",
       },
-      cache: "no-store",
-    },
-  );
+    );
 
-  if (response.status === 404) {
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      console.error("Unable to fetch public company.", {
+        slug,
+        status: response.status,
+      });
+      return null;
+    }
+
+    const result = await response.json();
+
+    return result?.data ?? result ?? null;
+  } catch (error) {
+    console.error("Failed to fetch public company.", {
+      slug,
+      error,
+    });
     return null;
   }
-
-  if (!response.ok) {
-    throw new Error(
-      `Unable to fetch public company (${response.status}).`,
-    );
-  }
-
-  const result = await response.json();
-
-  return result?.data ?? result ?? null;
 }

@@ -1,3 +1,5 @@
+import { fetchPublicBackend } from "@/lib/public-backend";
+
 export type BookStatus =
   | "want_to_read"
   | "reading"
@@ -125,11 +127,6 @@ export interface GetBooksParams {
   search?: string;
 }
 
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
-
 function emptyLibraryResponse(
   page: number,
   limit: number,
@@ -184,11 +181,11 @@ export async function getBooks({
   }
 
   const endpoint =
-    `${API_URL}/library/public?${query.toString()}`;
+    `/library/public?${query.toString()}`;
 
   try {
     const response =
-      await fetch(
+      await fetchPublicBackend(
         endpoint,
         {
           method: "GET",
@@ -234,8 +231,8 @@ export async function getBookBySlug(
   slug: string,
 ): Promise<Book | null> {
   const response =
-    await fetch(
-      `${API_URL}/library/public/slug/${encodeURIComponent(
+    await fetchPublicBackend(
+      `/library/public/slug/${encodeURIComponent(
         slug,
       )}`,
       {
@@ -281,8 +278,8 @@ export async function getBookHighlights(
   libraryItemId: string,
 ): Promise<LibraryHighlight[]> {
   const response =
-    await fetch(
-      `${API_URL}/library/public/${encodeURIComponent(
+    await fetchPublicBackend(
+      `/library/public/${encodeURIComponent(
         libraryItemId,
       )}/highlights`,
       {

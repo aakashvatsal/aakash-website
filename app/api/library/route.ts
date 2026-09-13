@@ -3,9 +3,7 @@ import {
   NextResponse,
 } from "next/server";
 
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  "http://localhost:4000/api/v1";
+import { fetchPublicBackend } from "@/lib/public-backend";
 
 export async function GET(
   request: NextRequest,
@@ -15,8 +13,8 @@ export async function GET(
       request.nextUrl.searchParams.toString();
 
     const response =
-      await fetch(
-        `${API_URL}/library/public?${query}`,
+      await fetchPublicBackend(
+        `/library/public?${query}`,
         {
           method: "GET",
           headers: {

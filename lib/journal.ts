@@ -1,13 +1,10 @@
+import { fetchPublicBackend } from "@/lib/public-backend";
+
 import type {
   JournalEntry,
   JournalListResponse,
   JournalQuery,
 } from "@/types/journal";
-
-const API_URL =
-  process.env.BACKEND_API_URL ??
-  process.env.NEXT_PUBLIC_API_URL ??
-  "http://localhost:4000/api/v1";
 
 function buildQuery(
   query?: JournalQuery,
@@ -139,8 +136,8 @@ export async function getJournalEntries(
   query?: JournalQuery,
 ): Promise<JournalListResponse> {
   const response =
-    await fetch(
-      `${API_URL}/journal${buildQuery(
+    await fetchPublicBackend(
+      `/journal${buildQuery(
         query,
       )}`,
       {
@@ -161,32 +158,59 @@ export async function getJournalEntries(
 export async function getPublicJournalEntries(
   query?: JournalQuery,
 ): Promise<JournalListResponse> {
-  const response =
-    await fetch(
-      `${API_URL}/journal/public${buildQuery(
-        query,
-      )}`,
-      {
-        cache:
-          "no-store",
+  const page = query?.page ?? 1;
+  const limit = query?.limit ?? 20;
+
+  try {
+    const response =
+      await fetchPublicBackend(
+        `/journal/public${buildQuery(
+          query,
+        )}`,
+        {
+          cache:
+            "no-store",
+        },
+      );
+
+    if (!response.ok) {
+      console.error("Unable to fetch public journal entries.", {
+        status: response.status,
+      });
+
+      return {
+        data: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        },
+      };
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error("Failed to fetch public journal entries.", error);
+
+    return {
+      data: [],
+      pagination: {
+        page,
+        limit,
+        total: 0,
+        totalPages: 0,
       },
-    );
-
-  if (!response.ok) {
-    throw new Error(
-      "Failed to fetch public journal entries.",
-    );
+    };
   }
-
-  return response.json();
 }
 
 export async function getJournalEntryById(
   journalEntryId: string,
 ): Promise<JournalEntry> {
   const response =
-    await fetch(
-      `${API_URL}/journal/${journalEntryId}`,
+    await fetchPublicBackend(
+      `/journal/${journalEntryId}`,
       {
         cache:
           "no-store",
@@ -206,8 +230,8 @@ export async function getJournalEntryBySlug(
   slug: string,
 ): Promise<JournalEntry> {
   const response =
-    await fetch(
-      `${API_URL}/journal/slug/${encodeURIComponent(
+    await fetchPublicBackend(
+      `/journal/slug/${encodeURIComponent(
         slug,
       )}`,
       {
@@ -229,8 +253,8 @@ export async function getPublicJournalEntryBySlug(
   slug: string,
 ): Promise<JournalEntry> {
   const response =
-    await fetch(
-      `${API_URL}/journal/public/${encodeURIComponent(
+    await fetchPublicBackend(
+      `/journal/public/${encodeURIComponent(
         slug,
       )}`,
       {
