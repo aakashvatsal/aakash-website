@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build",
     "start": "next start",
     "lint": "eslint",
-    "test:smoke": "node scripts/frontend-smoke.mjs"
+    "test:smoke": "node scripts/frontend-smoke.mjs",
+    "build:memory-debug": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next build --experimental-debug-memory-usage"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
