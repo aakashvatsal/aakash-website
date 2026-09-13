@@ -21,6 +21,7 @@ import {
 } from "react";
 
 import { Eyebrow } from "@/components/ui/Eyebrow";
+import { ChatRichText } from "@/components/features/hsakaa/ChatRichText";
 import { HsakaaPersonVerification } from "@/components/features/hsakaa/HsakaaPersonVerification";
 import {
   askHsakaa,
@@ -1086,9 +1087,7 @@ export function HsakaaPage({
                             </span>
                           </div>
 
-                          <p className="whitespace-pre-wrap text-[13px] font-normal leading-[1.75] text-white/72">
-                            {item.content}
-                          </p>
+                          <ChatRichText content={item.content} />
                         </div>
                       </div>
                     );
