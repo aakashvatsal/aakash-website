@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
-const API_URL = process.env.BACKEND_API_URL ?? "http://localhost:4000/api/v1";
+const API_URL = process.env.BACKEND_API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
+  "http://localhost:4000/api/v1";
 
 function unwrapNow(payload: unknown) {
   if (payload && typeof payload === "object" && "data" in payload) {

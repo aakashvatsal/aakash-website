@@ -5,6 +5,7 @@ import type {
 
 const API_URL =
   process.env.BACKEND_API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:4000/api/v1";
 
 export async function getCompanies(): Promise<Company[]> {
