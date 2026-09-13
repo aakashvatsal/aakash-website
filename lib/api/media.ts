@@ -1080,10 +1080,14 @@ export async function generateMediaVoiceProfile(payload?: {
 }
 
 export async function getMediaPlanningOverview() {
-  const response = await fetch(`${API_URL}/media/core/planning/overview`, {
-    cache: "no-store",
-    headers: getAdminBackendHeaders(),
-  });
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/planning/overview`,
+    {
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" },
+    },
+  );
   return parseResponse<import("@/types/media").MediaPlanningOverview>(response);
 }
 

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Archive,
   CalendarDays,
@@ -54,10 +53,11 @@ function safeArray<T>(value: T[] | null | undefined): T[] {
 
 export function MediaPlanningManager({
   initialOverview,
+  onOverviewRefresh,
 }: {
   initialOverview: MediaPlanningOverview;
+  onOverviewRefresh?: () => Promise<void> | void;
 }) {
-  const router = useRouter();
   const [notes, setNotes] = useState("");
   const [outingStatus, setOutingStatus] = useState<
     "yes" | "no" | "maybe" | "unknown"
@@ -108,7 +108,7 @@ export function MediaPlanningManager({
           setError("");
           setRefreshingDate(null);
           setMessage("HSAKAA completed the rolling execution-ready plan.");
-          router.refresh();
+          await onOverviewRefresh?.();
           return;
         }
         if (next.status === "failed") {
@@ -135,7 +135,7 @@ export function MediaPlanningManager({
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [generationJobId, generationJobStatus, router]);
+  }, [generationJobId, generationJobStatus, onOverviewRefresh]);
 
   const startGeneration = useCallback(
     async (payload: Parameters<typeof startMediaPlanningGeneration>[0]) => {
@@ -151,7 +151,7 @@ export function MediaPlanningManager({
         );
         if (job.status === "generated") {
           setRefreshingDate(null);
-          router.refresh();
+          await onOverviewRefresh?.();
         }
         if (job.status === "failed") {
           setRefreshingDate(null);
@@ -166,7 +166,7 @@ export function MediaPlanningManager({
         );
       }
     },
-    [router],
+    [onOverviewRefresh],
   );
 
   async function generate() {
@@ -262,7 +262,7 @@ export function MediaPlanningManager({
             </h2>
             <p className="mt-2 text-sm leading-6 text-white/50">
               The week is designed for recognisability, authority and
-              familiarity—not content spam. Feed posts stay execution-ready,
+              familiarity-not content spam. Feed posts stay execution-ready,
               while daily Instagram Stories use routine/current context as a
               lightweight human-presence layer. Skips remain healthy when no
               feed asset is needed.
@@ -291,8 +291,8 @@ export function MediaPlanningManager({
               Rolling window
             </p>
             <p className="mt-1 text-sm font-black text-white">
-              {initialOverview.rolling?.startDate ?? plan?.startDate ?? "—"} →{" "}
-              {initialOverview.rolling?.endDate ?? plan?.endDate ?? "—"}
+              {initialOverview.rolling?.startDate ?? plan?.startDate ?? "-"} →{" "}
+              {initialOverview.rolling?.endDate ?? plan?.endDate ?? "-"}
             </p>
             <p className="mt-2 text-xs leading-5 text-white/40">
               Fresh history starts 7 September 2026. When you click Generate, HSAKAA keeps the existing days and creates only the missing date(s). Past days move to Plan Archive.
@@ -342,7 +342,7 @@ export function MediaPlanningManager({
         <textarea
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
-          placeholder="Optional direction for this rolling window — e.g. lighter workload, avoid company promotion, batch-record Saturday."
+          placeholder="Optional direction for this rolling window - e.g. lighter workload, avoid company promotion, batch-record Saturday."
           className="mt-5 min-h-24 w-full rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm text-white outline-none placeholder:text-white/25"
         />
         {generationJob ? (
@@ -788,7 +788,7 @@ function CadenceSummary({
       </div>
       <p className="mt-1 text-xs leading-5 text-white/40">
         Fastest sustainable path to 100K: discovery, follower conversion,
-        recognizable series and authority—without using extra posting volume as
+        recognizable series and authority-without using extra posting volume as
         a substitute for quality.
       </p>
 
@@ -1148,7 +1148,7 @@ function Execution({ item }: { item: MediaPlanningExecution }) {
               <SmallField label="Why this format" value={item.whyThisFormat} />
               <SmallField
                 label="Production note"
-                value={item.productionNotes || "—"}
+                value={item.productionNotes || "-"}
               />
               {evidenceIds.length ? (
                 <div>
@@ -1188,9 +1188,9 @@ function ImagePack({
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <SmallField
           label="Mode"
-          value={brief.mode?.replaceAll("_", " ") || "—"}
+          value={brief.mode?.replaceAll("_", " ") || "-"}
         />
-        <SmallField label="Aspect ratio" value={brief.aspectRatio || "—"} />
+        <SmallField label="Aspect ratio" value={brief.aspectRatio || "-"} />
       </div>
       {brief.overlayText ? (
         <CopyField label="Overlay text" value={brief.overlayText} />
@@ -1338,7 +1338,7 @@ function SmallField({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/25">
         {label}
       </p>
-      <p className="mt-1 text-xs leading-5 text-white/55">{value || "—"}</p>
+      <p className="mt-1 text-xs leading-5 text-white/55">{value || "-"}</p>
     </div>
   );
 }

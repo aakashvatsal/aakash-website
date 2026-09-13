@@ -13,9 +13,6 @@ type Block =
   | { type: "heading"; level: number; value: string }
   | { type: "rule" };
 
-const INLINE_MARKDOWN_PATTERN =
-  /(\*\*\*[^*\n]+\*\*\*|___[^_\n]+___|\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|`[^`\n]+`|\[[^\]\n]+\]\([^\)\n]+\)|\*[^*\n]+\*|_[^_\n]+_)/g;
-
 function safeHref(value: string): string | null {
   const href = value.trim();
 
@@ -32,9 +29,12 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   let match: RegExpExecArray | null;
   let tokenIndex = 0;
 
-  INLINE_MARKDOWN_PATTERN.lastIndex = 0;
+  // A local RegExp per recursion prevents nested formatting from resetting
+  // the parent parser state.
+  const inlineMarkdownPattern =
+    /(\*\*\*[^*\n]+\*\*\*|___[^_\n]+___|\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|`[^`\n]+`|\[[^\]\n]+\]\([^)\n]+\)|\*[^*\n]+\*|_[^_\n]+_)/g;
 
-  while ((match = INLINE_MARKDOWN_PATTERN.exec(text)) !== null) {
+  while ((match = inlineMarkdownPattern.exec(text)) !== null) {
     if (match.index > lastIndex) {
       nodes.push(text.slice(lastIndex, match.index));
     }
@@ -47,7 +47,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       (token.startsWith("___") && token.endsWith("___"))
     ) {
       nodes.push(
-        <strong key={key} className="font-semibold text-white/92">
+        <strong key={key} className="font-bold text-white">
           <em>{token.slice(3, -3)}</em>
         </strong>,
       );
@@ -56,7 +56,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
       (token.startsWith("__") && token.endsWith("__"))
     ) {
       nodes.push(
-        <strong key={key} className="font-semibold text-white/92">
+        <strong key={key} className="font-bold text-white">
           {renderInline(token.slice(2, -2), `${key}-strong`)}
         </strong>,
       );

@@ -22,6 +22,7 @@ import {
   useState,
 } from "react";
 
+import { ChatRichText } from "@/components/features/hsakaa/ChatRichText";
 import { HsakaaPatternIntelligence } from "@/components/admin/hsakaa/intelligence/HsakaaPatternIntelligence";
 import { HsakaaDecisionLab } from "@/components/admin/hsakaa/intelligence/HsakaaDecisionLab";
 import { HsakaaWeeklyReview } from "@/components/admin/hsakaa/intelligence/HsakaaWeeklyReview";
@@ -380,7 +381,7 @@ export function HsakaaIntelligence() {
                     {card.label}
                   </p>
                   <p className="mt-3 text-3xl font-black tracking-[-0.05em] text-white">
-                    {isLoading ? "—" : card.value}
+                    {isLoading ? "-" : card.value}
                   </p>
                 </div>
 
@@ -620,9 +621,13 @@ export function HsakaaIntelligence() {
                         </span>
                       </div>
 
-                      <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-white/70">
-                        {message.content}
-                      </p>
+                      <div className="mt-3 text-sm leading-7 text-white/70">
+                        {assistant ? (
+                          <ChatRichText content={message.content} />
+                        ) : (
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                        )}
+                      </div>
 
                       {assistant ? (
                         <div className="mt-4 border-t border-white/10 pt-4">

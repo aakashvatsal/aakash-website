@@ -17,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 
+import { ChatRichText } from "@/components/features/hsakaa/ChatRichText";
+
 import {
   askPrivateHsakaa,
   confirmPrivateHsakaaAction,
@@ -46,11 +48,11 @@ const MODES: HsakaaMode[] = [
 
 function formatPreviewValue(value: unknown) {
   if (value === null || value === undefined || value === "") {
-    return "—";
+    return "-";
   }
 
   if (Array.isArray(value)) {
-    return value.length ? value.join(", ") : "—";
+    return value.length ? value.join(", ") : "-";
   }
 
   if (typeof value === "boolean") {
@@ -373,7 +375,11 @@ export function PrivateHsakaaChat() {
                 : "border border-white/10 bg-black/20 text-white/70"
             }`}
           >
-            <div className="whitespace-pre-wrap">{item.content}</div>
+            {item.role === "assistant" ? (
+              <ChatRichText content={item.content} />
+            ) : (
+              <div className="whitespace-pre-wrap">{item.content}</div>
+            )}
 
             {item.actions?.map((action) => (
               <ActionCard
@@ -402,7 +408,7 @@ export function PrivateHsakaaChat() {
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           rows={2}
-          placeholder="Ask HSAKAA — or tell it to create/update a task…"
+          placeholder="Ask HSAKAA - or tell it to create/update a task…"
           className="min-h-12 flex-1 resize-none rounded-[16px] border border-white/10 bg-[#030608] px-4 py-3 text-sm leading-6 text-white outline-none placeholder:text-white/25 focus:border-[#C6FF32]/40"
         />
         <button

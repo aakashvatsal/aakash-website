@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
-import { MediaPlanningManager } from "@/components/admin/media/MediaPlanningManager";
-import { getMediaPlanningOverview } from "@/lib/api/media";
+import { MediaPlanningPageClient } from "@/components/admin/media/MediaPlanningPageClient";
 
-export default async function MediaPlanningPage() {
-  const overview = await getMediaPlanningOverview();
+export default function MediaPlanningPage() {
   return (
     <div className="space-y-8">
       <AdminPageHeader
@@ -34,7 +32,7 @@ export default async function MediaPlanningPage() {
           </div>
         }
       />
-      <MediaPlanningManager initialOverview={overview} />
+      <MediaPlanningPageClient />
     </div>
   );
 }

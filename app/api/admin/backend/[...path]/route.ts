@@ -12,6 +12,7 @@ export const maxDuration = 600;
 
 const BACKEND_URL =
   process.env.BACKEND_API_URL ??
+  process.env.NEXT_PUBLIC_API_URL ??
   "http://127.0.0.1:4000/api/v1";
 
 function normalizeLocalBackendUrl(value: string) {
