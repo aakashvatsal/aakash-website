@@ -10,6 +10,7 @@ import {
   Bot,
   Check,
   Clock3,
+  History,
   LoaderCircle,
   RefreshCcw,
   Send,
@@ -22,8 +23,11 @@ import { ChatRichText } from "@/components/features/hsakaa/ChatRichText";
 import {
   askPrivateHsakaa,
   confirmPrivateHsakaaAction,
+  getPrivateHsakaaConversation,
+  getPrivateHsakaaConversations,
   rejectPrivateHsakaaAction,
   type HsakaaMode,
+  type PrivateHsakaaConversationSummary,
   type HsakaaProposedAction,
 } from "@/services/hsakaa.service";
 
@@ -177,6 +181,11 @@ export function PrivateHsakaaChat() {
     useState(false);
   const [busyActionId, setBusyActionId] =
     useState<string | null>(null);
+  const [conversations, setConversations] = useState<
+    PrivateHsakaaConversationSummary[]
+  >([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [chat, setChat] = useState<ChatMessage[]>([
     {
       role: "assistant",
@@ -187,17 +196,95 @@ export function PrivateHsakaaChat() {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const stored =
-      window.sessionStorage.getItem(STORAGE_KEY);
+    let cancelled = false;
 
-    if (stored && /^[0-9a-f]{24}$/i.test(stored)) {
-      setConversationId(stored);
+    async function hydrateHistory() {
+      setHistoryLoading(true);
+      setHistoryError(null);
+
+      try {
+        const history = await getPrivateHsakaaConversations({ limit: 40 });
+        if (cancelled) return;
+        setConversations(history.data);
+
+        const stored = window.sessionStorage.getItem(STORAGE_KEY);
+        if (!stored || !/^[0-9a-f]{24}$/i.test(stored)) return;
+
+        try {
+          const detail = await getPrivateHsakaaConversation(stored);
+          if (cancelled) return;
+          setConversationId(stored);
+          setMode((detail.conversation.mode as HsakaaMode) || "Chat");
+          setChat(
+            detail.messages.map((item) => ({
+              role: item.role,
+              content: item.content,
+            })),
+          );
+        } catch {
+          window.sessionStorage.removeItem(STORAGE_KEY);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setHistoryError(
+            error instanceof Error
+              ? error.message
+              : "Could not load conversation history.",
+          );
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
     }
+
+    void hydrateHistory();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chat, isLoading, busyActionId]);
+
+  async function refreshConversationHistory() {
+    try {
+      const history = await getPrivateHsakaaConversations({ limit: 40 });
+      setConversations(history.data);
+      setHistoryError(null);
+    } catch (error) {
+      setHistoryError(
+        error instanceof Error
+          ? error.message
+          : "Could not refresh conversation history.",
+      );
+    }
+  }
+
+  async function openConversation(id: string) {
+    if (isLoading || busyActionId) return;
+
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const detail = await getPrivateHsakaaConversation(id);
+      setConversationId(id);
+      window.sessionStorage.setItem(STORAGE_KEY, id);
+      setMode((detail.conversation.mode as HsakaaMode) || "Chat");
+      setChat(
+        detail.messages.map((item) => ({
+          role: item.role,
+          content: item.content,
+        })),
+      );
+    } catch (error) {
+      setHistoryError(
+        error instanceof Error ? error.message : "Could not open conversation.",
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -234,6 +321,7 @@ export function PrivateHsakaaChat() {
           actions: result.proposedActions,
         },
       ]);
+      void refreshConversationHistory();
     } catch (error) {
       setChat((current) => [
         ...current,
@@ -325,7 +413,60 @@ export function PrivateHsakaaChat() {
   }
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.025]">
+    <div className="grid overflow-hidden rounded-[28px] border border-white/10 bg-white/[0.025] lg:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="border-b border-white/10 bg-black/10 lg:border-b-0 lg:border-r">
+        <div className="flex items-center justify-between border-b border-white/10 p-4">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-[#C6FF32]" />
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-white/70">
+                My conversations
+              </p>
+              <p className="mt-0.5 text-[11px] text-white/30">Private HSAKAA history</p>
+            </div>
+          </div>
+          {historyLoading ? (
+            <LoaderCircle className="h-4 w-4 animate-spin text-white/30" />
+          ) : null}
+        </div>
+
+        <div className="max-h-56 overflow-y-auto p-2 lg:max-h-[720px]">
+          {historyError ? (
+            <p className="m-2 rounded-xl border border-red-400/20 bg-red-400/5 px-3 py-2 text-xs leading-5 text-red-200/70">
+              {historyError}
+            </p>
+          ) : null}
+
+          {!historyLoading && conversations.length === 0 ? (
+            <p className="px-3 py-5 text-xs leading-5 text-white/30">
+              Your private conversations will appear here after you chat with HSAKAA.
+            </p>
+          ) : null}
+
+          {conversations.map((conversation) => (
+            <button
+              key={conversation._id}
+              type="button"
+              onClick={() => void openConversation(conversation._id)}
+              className={`mb-1 w-full rounded-xl px-3 py-2.5 text-left transition ${
+                conversationId === conversation._id
+                  ? "bg-[#C6FF32]/10 text-white"
+                  : "text-white/55 hover:bg-white/[0.04] hover:text-white/80"
+              }`}
+            >
+              <p className="truncate text-xs font-bold">
+                {conversation.title || "Private conversation"}
+              </p>
+              <div className="mt-1 flex items-center justify-between gap-2 text-[10px] text-white/30">
+                <span>{conversation.mode || "Chat"}</span>
+                <span>{conversation.messageCount} messages</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      <div className="min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-4 sm:p-5">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-2xl border border-[#C6FF32]/20 bg-[#C6FF32]/10 text-[#C6FF32]">
@@ -419,6 +560,7 @@ export function PrivateHsakaaChat() {
           <Send className="h-4 w-4" />
         </button>
       </form>
+      </div>
     </div>
   );
 }

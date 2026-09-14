@@ -210,6 +210,11 @@ const navigation: NavigationItem[] = [
         icon: Bot,
       },
       {
+        title: "My Chats",
+        href: "/admin/hsakaa/my-chats",
+        icon: MessageCircle,
+      },
+      {
         title: "People",
         href: "/admin/hsakaa/people",
         icon: UserRound,

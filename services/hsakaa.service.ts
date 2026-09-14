@@ -67,6 +67,7 @@ export type HsakaaProposedAction = {
 export type HsakaaChatResponse = {
   answer: string;
   conversationId: string;
+  messageId?: string;
   scope?: "private";
   ai?: {
     model: string;
@@ -82,6 +83,76 @@ export type HsakaaActionResponse = {
   action: Omit<HsakaaProposedAction, "confirmationToken">;
   message: string;
   alreadyExecuted?: boolean;
+};
+
+export type PrivateHsakaaConversationSummary = {
+  _id: string;
+  mode: string;
+  title: string;
+  isActive: boolean;
+  lastMessageAt?: string;
+  messageCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type PrivateHsakaaConversationMessage = {
+  _id: string;
+  role: "user" | "assistant";
+  content: string;
+  metadata?: Record<string, unknown>;
+  createdAt?: string;
+};
+
+export type MyChatChannel =
+  | "whatsapp"
+  | "instagram"
+  | "linkedin"
+  | "x"
+  | "slack"
+  | "sms"
+  | "other";
+
+export type MyChatAuthor = "owner" | "person" | "other";
+
+export type MyChatMessage = {
+  _id?: string;
+  author: MyChatAuthor;
+  content: string;
+  sentAt?: string;
+};
+
+export type MyChatThread = {
+  _id: string;
+  title: string;
+  personId?:
+    | string
+    | {
+        _id: string;
+        name: string;
+        preferredName?: string;
+        relationship?: string;
+        relationshipLabel?: string;
+      }
+    | null;
+  channel: MyChatChannel;
+  sourceLabel?: string;
+  messageCount: number;
+  ownerMessageCount: number;
+  lastMessageAt?: string;
+  createdAt?: string;
+};
+
+export type ImportMyChatRequest = {
+  title: string;
+  personId?: string;
+  channel: MyChatChannel;
+  sourceLabel?: string;
+  messages: Array<{
+    author: MyChatAuthor;
+    content: string;
+    sentAt?: string;
+  }>;
 };
 
 const SESSION_STORAGE_KEY =
@@ -153,6 +224,51 @@ export async function askHsakaa(
   }
 
   return payload as HsakaaChatResponse;
+}
+
+
+async function readSpeechResponse(response: Response) {
+  if (!response.ok) {
+    const payload = await readJson<{ message: string }>(response);
+    throw new Error(payload?.message || "Aakash voice is unavailable right now.");
+  }
+
+  return response.blob();
+}
+
+export async function getHsakaaSpeechAudio(data: {
+  conversationId: string;
+  messageId: string;
+}) {
+  const response = await fetch("/api/hsakaa/speech", {
+    method: "POST",
+    headers: {
+      Accept: "audio/mpeg",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...data,
+      sessionId: getOrCreateSessionId(),
+    }),
+  });
+
+  return readSpeechResponse(response);
+}
+
+export async function getVerifiedPersonHsakaaSpeechAudio(data: {
+  conversationId: string;
+  messageId: string;
+}) {
+  const response = await fetch("/api/hsakaa/person/speech", {
+    method: "POST",
+    headers: {
+      Accept: "audio/mpeg",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  return readSpeechResponse(response);
 }
 
 export async function askPrivateHsakaa(
@@ -250,6 +366,169 @@ export function rejectPrivateHsakaaAction(
     confirmationToken,
     "reject",
   );
+}
+
+
+export async function getPrivateHsakaaConversations(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.search?.trim()) query.set("search", params.search.trim());
+
+  const response = await fetch(
+    `/api/admin/backend/hsakaa/private/conversations${query.size ? `?${query.toString()}` : ""}`,
+    { credentials: "include", cache: "no-store" },
+  );
+  const payload = await readJson<{
+    data: PrivateHsakaaConversationSummary[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(response);
+
+  if (!response.ok || !payload?.data) {
+    throw new Error(payload?.message || "Could not load private conversations.");
+  }
+  return payload as {
+    data: PrivateHsakaaConversationSummary[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export async function getPrivateHsakaaConversation(conversationId: string) {
+  const response = await fetch(
+    `/api/admin/backend/hsakaa/private/conversations/${encodeURIComponent(conversationId)}`,
+    { credentials: "include", cache: "no-store" },
+  );
+  const payload = await readJson<{
+    conversation: PrivateHsakaaConversationSummary;
+    messages: PrivateHsakaaConversationMessage[];
+  }>(response);
+
+  if (!response.ok || !payload?.conversation || !payload.messages) {
+    throw new Error(payload?.message || "Could not load that conversation.");
+  }
+  return payload as {
+    conversation: PrivateHsakaaConversationSummary;
+    messages: PrivateHsakaaConversationMessage[];
+  };
+}
+
+export async function getMyChats(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  personId?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.page) query.set("page", String(params.page));
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.search?.trim()) query.set("search", params.search.trim());
+  if (params?.personId) query.set("personId", params.personId);
+
+  const response = await fetch(
+    `/api/admin/backend/hsakaa/private/my-chats${query.size ? `?${query.toString()}` : ""}`,
+    { credentials: "include", cache: "no-store" },
+  );
+  const payload = await readJson<{
+    data: MyChatThread[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }>(response);
+
+  if (!response.ok || !payload?.data) {
+    throw new Error(payload?.message || "Could not load My Chats.");
+  }
+  return payload as {
+    data: MyChatThread[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export async function getMyChat(threadId: string) {
+  const response = await fetch(
+    `/api/admin/backend/hsakaa/private/my-chats/${encodeURIComponent(threadId)}`,
+    { credentials: "include", cache: "no-store" },
+  );
+  const payload = await readJson<{
+    thread: MyChatThread;
+    messages: MyChatMessage[];
+  }>(response);
+
+  if (!response.ok || !payload?.thread || !payload.messages) {
+    throw new Error(payload?.message || "Could not load imported chat.");
+  }
+  return payload as { thread: MyChatThread; messages: MyChatMessage[] };
+}
+
+export async function importMyChat(data: ImportMyChatRequest) {
+  const response = await fetch(
+    "/api/admin/backend/hsakaa/private/my-chats/import",
+    {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(data),
+    },
+  );
+  const payload = await readJson<{
+    thread: MyChatThread;
+    importedMessages: number;
+    ownerMessagesAvailableForLearning: number;
+    learning?: Record<string, unknown>;
+  }>(response);
+
+  if (!response.ok || !payload?.thread) {
+    throw new Error(payload?.message || "Could not import chat.");
+  }
+  return payload as {
+    thread: MyChatThread;
+    importedMessages: number;
+    ownerMessagesAvailableForLearning: number;
+    learning?: Record<string, unknown>;
+  };
+}
+
+export async function archiveMyChat(threadId: string) {
+  const response = await fetch(
+    `/api/admin/backend/hsakaa/private/my-chats/${encodeURIComponent(threadId)}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  const payload = await readJson<{ archived: boolean; id: string }>(response);
+  if (!response.ok || !payload?.archived) {
+    throw new Error(payload?.message || "Could not archive imported chat.");
+  }
+  return payload as { archived: boolean; id: string };
+}
+
+export async function refreshMyChatLearning(personId?: string) {
+  const response = await fetch(
+    "/api/admin/backend/hsakaa/private/my-chats/refresh-learning",
+    {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(personId ? { personId } : {}),
+    },
+  );
+  const payload = await readJson<Record<string, unknown>>(response);
+  if (!response.ok) {
+    throw new Error(payload?.message || "Could not refresh communication learning.");
+  }
+  return payload as Record<string, unknown>;
 }
 
 

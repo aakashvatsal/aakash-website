@@ -9,6 +9,9 @@ import {
   NotebookText,
   Plus,
   Send,
+  LoaderCircle,
+  Square,
+  Volume2,
 } from "lucide-react";
 import { motion } from "motion/react";
 import {
@@ -27,6 +30,8 @@ import {
   askHsakaa,
   askVerifiedPersonHsakaa,
   getHsakaaPersonSession,
+  getHsakaaSpeechAudio,
+  getVerifiedPersonHsakaaSpeechAudio,
 } from "@/services/hsakaa.service";
 
 import type {
@@ -42,6 +47,7 @@ type Mode = Exclude<HsakaaMode, "Health" | "Media">;
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  messageId?: string;
 };
 
 interface HsakaaPageProps {
@@ -423,6 +429,21 @@ export function HsakaaPage({
   ] = useState(false);
 
   const [
+    speechMessageId,
+    setSpeechMessageId,
+  ] = useState<string | null>(null);
+
+  const [
+    speechLoadingMessageId,
+    setSpeechLoadingMessageId,
+  ] = useState<string | null>(null);
+
+  const [
+    speechError,
+    setSpeechError,
+  ] = useState<string | null>(null);
+
+  const [
     verifiedPerson,
     setVerifiedPerson,
   ] = useState<HsakaaVerifiedPerson | null>(null);
@@ -466,6 +487,12 @@ export function HsakaaPage({
 
   const initialQuestionHandledRef =
     useRef(false);
+
+  const audioRef =
+    useRef<HTMLAudioElement | null>(null);
+
+  const speechUrlRef =
+    useRef<string | null>(null);
 
   const suggestions =
     suggestionsByMode[activeMode];
@@ -659,6 +686,90 @@ export function HsakaaPage({
     )}px`;
   }, [message]);
 
+  const stopSpeech = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+
+    if (speechUrlRef.current) {
+      URL.revokeObjectURL(speechUrlRef.current);
+      speechUrlRef.current = null;
+    }
+
+    setSpeechMessageId(null);
+    setSpeechLoadingMessageId(null);
+  }, []);
+
+  const toggleSpeech = useCallback(
+    async (messageId: string) => {
+      if (!conversationId) {
+        return;
+      }
+
+      if (speechMessageId === messageId && audioRef.current) {
+        stopSpeech();
+        return;
+      }
+
+      stopSpeech();
+      setSpeechError(null);
+      setSpeechLoadingMessageId(messageId);
+
+      try {
+        const blob = verifiedPerson
+          ? await getVerifiedPersonHsakaaSpeechAudio({
+              conversationId,
+              messageId,
+            })
+          : await getHsakaaSpeechAudio({
+              conversationId,
+              messageId,
+            });
+
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        speechUrlRef.current = url;
+        audioRef.current = audio;
+        setSpeechLoadingMessageId(null);
+        setSpeechMessageId(messageId);
+
+        audio.onended = stopSpeech;
+        audio.onerror = () => {
+          setSpeechError("I couldn’t play that voice response right now.");
+          stopSpeech();
+        };
+
+        await audio.play();
+      } catch (error) {
+        setSpeechError(
+          error instanceof Error
+            ? error.message
+            : "Aakash voice is unavailable right now.",
+        );
+        stopSpeech();
+      }
+    },
+    [
+      conversationId,
+      speechMessageId,
+      stopSpeech,
+      verifiedPerson,
+    ],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      if (speechUrlRef.current) {
+        URL.revokeObjectURL(speechUrlRef.current);
+      }
+    };
+  }, []);
+
   const sendMessage = useCallback(
     async (text?: string) => {
       const finalMessage = (
@@ -706,6 +817,7 @@ export function HsakaaPage({
           {
             role: "assistant",
             content: response.answer,
+            messageId: response.messageId,
           },
         ]);
       } catch (error) {
@@ -1085,6 +1197,25 @@ export function HsakaaPage({
                             <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/28">
                               Aakash
                             </span>
+
+                            {item.messageId && conversationId ? (
+                              <button
+                                type="button"
+                                onClick={() => void toggleSpeech(item.messageId!)}
+                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white/30 transition hover:bg-white/[0.05] hover:text-white/65"
+                                aria-label={speechMessageId === item.messageId ? "Stop voice" : "Listen to Aakash"}
+                                title={speechMessageId === item.messageId ? "Stop" : "Listen"}
+                              >
+                                {speechLoadingMessageId === item.messageId ? (
+                                  <LoaderCircle className="h-3 w-3 animate-spin" />
+                                ) : speechMessageId === item.messageId ? (
+                                  <Square className="h-2.5 w-2.5 fill-current" />
+                                ) : (
+                                  <Volume2 className="h-3 w-3" />
+                                )}
+                                <span>{speechMessageId === item.messageId ? "Stop" : "Listen"}</span>
+                              </button>
+                            ) : null}
                           </div>
 
                           <ChatRichText content={item.content} />
@@ -1128,6 +1259,12 @@ export function HsakaaPage({
                     </div>
                   </div>
                 )}
+
+                {speechError ? (
+                  <p className="pl-10 text-[10px] text-red-300/70">
+                    {speechError}
+                  </p>
+                ) : null}
 
                 <div
                   ref={messagesEndRef}
