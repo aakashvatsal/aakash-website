@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CalendarDays, Loader2, RefreshCw, Send } from "lucide-react";
 
+import { FullHealthNutritionPlan } from "./FullHealthNutritionPlan";
+
 import {
   createHealthOwnerUpdate,
   ensureHealthPlan,
@@ -56,19 +58,7 @@ function PlanDetail({ day, domain }: { day: HealthPlanDay; domain: HealthOwnerUp
       <div className="grid gap-3 lg:grid-cols-3"><Metric label="Cardio" value={`${day.training.cardio.type} · ${day.training.cardio.durationMinutes} min`} /><BulletPlan title="Progression" items={[day.training.progressionRule].filter(Boolean)} empty="—" /><BulletPlan title="Deload" items={[day.training.deloadNote].filter(Boolean)} empty="—" /></div>
     </div>;
   }
-  if (domain === "diet") {
-    return <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Metric label="Calories" value={day.nutrition.calorieTarget ? `${day.nutrition.calorieTarget} kcal` : "Flexible"} />
-        <Metric label="Protein" value={day.nutrition.proteinGrams ? `${day.nutrition.proteinGrams} g` : "—"} />
-        <Metric label="Carbs" value={day.nutrition.carbsGrams ? `${day.nutrition.carbsGrams} g` : "—"} />
-        <Metric label="Fat" value={day.nutrition.fatGrams ? `${day.nutrition.fatGrams} g` : "—"} />
-        <Metric label="Water" value={day.nutrition.hydrationLitres ? `${day.nutrition.hydrationLitres} L` : "—"} />
-      </div>
-      <div className="grid gap-3 lg:grid-cols-2">{day.nutrition.meals.map((meal, index) => <div key={`${meal.time}-${index}`} className="rounded-[18px] border border-white/10 bg-black/20 p-4"><p className="text-xs font-black uppercase tracking-[0.14em] text-[#C6FF32]">{meal.time} · {meal.label}</p><p className="mt-2 text-sm leading-6 text-white/60">{meal.guidance}</p>{meal.proteinGrams ? <p className="mt-2 text-xs text-white/35">~{meal.proteinGrams} g protein</p> : null}</div>)}</div>
-      {day.nutrition.notes.length ? <p className="text-sm leading-6 text-white/45">{day.nutrition.notes.join(" · ")}</p> : null}
-    </div>;
-  }
+  if (domain === "diet") return <FullHealthNutritionPlan nutrition={day.nutrition} />;
   if (domain === "supplements") return <BulletPlan title="Configured schedule" items={day.supplementSchedule} empty="No supplement task is scheduled for this day. Existing configured doses remain authoritative." />;
   if (domain === "meditation") return <div className="grid gap-3 md:grid-cols-4"><Metric label="Type" value={day.meditation.type || "Recovery"} /><Metric label="Duration" value={`${day.meditation.durationMinutes} min`} /><Metric label="When" value={day.meditation.when || "Flexible"} /><Metric label="Purpose" value={day.meditation.intention || "Reset"} /></div>;
   if (domain === "skincare") return <div className="space-y-3"><div className="grid gap-3 lg:grid-cols-3"><BulletPlan title="Morning" items={day.skincare.morning} empty="No morning step" /><BulletPlan title="Evening" items={day.skincare.evening} empty="No evening step" /><BulletPlan title="Focus" items={[day.skincare.improvementFocus].filter(Boolean)} empty="Maintain routine" /></div><div className="grid gap-3 lg:grid-cols-3"><BulletPlan title="Body care · morning" items={day.bodyCare.morning} empty="No body-care step" /><BulletPlan title="Body care · evening" items={day.bodyCare.evening} empty="No body-care step" /><BulletPlan title="Body-care focus" items={[day.bodyCare.improvementFocus].filter(Boolean)} empty="Maintain routine" /></div></div>;

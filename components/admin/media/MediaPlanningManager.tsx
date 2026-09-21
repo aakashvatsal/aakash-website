@@ -169,16 +169,32 @@ export function MediaPlanningManager({
     [onOverviewRefresh],
   );
 
-  async function generate() {
-    if (outingStatus === "unknown") {
-      setError(
-        "Tell HSAKAA whether you are going out / travelling this week before rebuilding the seven-day window.",
-      );
-      return;
-    }
+  function canGenerateWeek() {
+    if (outingStatus !== "unknown") return true;
+    setError(
+      "Tell HSAKAA whether you are going out / travelling this week before updating the seven-day window.",
+    );
+    return false;
+  }
+
+  async function generateMissingDays() {
+    if (!canGenerateWeek()) return;
     await startGeneration({
       force: false,
       mode: "roll",
+      notes: notes.trim() ? notes : undefined,
+      outingStatus,
+      outingDetails,
+    });
+  }
+
+  async function refreshAllSevenDays() {
+    if (!canGenerateWeek()) return;
+    setRefreshingDate(null);
+    await startGeneration({
+      force: true,
+      mode: "week",
+      startDate: initialOverview.rolling?.startDate,
       notes: notes.trim() ? notes : undefined,
       outingStatus,
       outingDetails,
@@ -268,22 +284,34 @@ export function MediaPlanningManager({
               feed asset is needed.
             </p>
           </div>
-          <button
-            disabled={
-              isGenerating ||
-              !initialOverview.presenceReady ||
-              !initialOverview.rolling?.missingDates?.length
-            }
-            onClick={generate}
-            className="rounded-xl bg-[#C6FF32] px-4 py-2.5 text-sm font-black text-black disabled:opacity-40"
-          >
-            <RefreshCw className="mr-2 inline h-4 w-4" />
-            {isGenerating
-              ? "Planning in background…"
-              : initialOverview.rolling?.missingDates?.length
-                ? `Generate ${initialOverview.rolling.missingDates.length} missing day${initialOverview.rolling.missingDates.length === 1 ? "" : "s"}`
-                : "7-day plan complete"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled={
+                isGenerating ||
+                !initialOverview.presenceReady ||
+                !initialOverview.rolling?.missingDates?.length
+              }
+              onClick={generateMissingDays}
+              className="rounded-xl bg-[#C6FF32] px-4 py-2.5 text-sm font-black text-black disabled:opacity-40"
+            >
+              <Sparkles className="mr-2 inline h-4 w-4" />
+              {isGenerating
+                ? "Planning in background…"
+                : initialOverview.rolling?.missingDates?.length
+                  ? `Generate ${initialOverview.rolling.missingDates.length} missing day${initialOverview.rolling.missingDates.length === 1 ? "" : "s"}`
+                  : "No missing days"}
+            </button>
+            <button
+              disabled={isGenerating || !initialOverview.presenceReady}
+              onClick={refreshAllSevenDays}
+              className="rounded-xl border border-[#C6FF32]/35 bg-[#C6FF32]/[0.06] px-4 py-2.5 text-sm font-black text-[#C6FF32] transition hover:bg-[#C6FF32]/10 disabled:opacity-40"
+            >
+              <RefreshCw
+                className={`mr-2 inline h-4 w-4 ${isGenerating ? "animate-spin" : ""}`}
+              />
+              {isGenerating ? "Refreshing…" : "Refresh all 7 days"}
+            </button>
+          </div>
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -295,7 +323,7 @@ export function MediaPlanningManager({
               {initialOverview.rolling?.endDate ?? plan?.endDate ?? "-"}
             </p>
             <p className="mt-2 text-xs leading-5 text-white/40">
-              Fresh history starts 7 September 2026. When you click Generate, HSAKAA keeps the existing days and creates only the missing date(s). Past days move to Plan Archive.
+              Fresh history starts 7 September 2026. Generate Missing keeps every existing day unchanged and creates only the missing date(s). Refresh all 7 days rebuilds the entire active window from the latest strategy, evidence and context. Previous plans remain available in Plan Archive.
             </p>
             {initialOverview.rolling?.missingDates?.length ? (
               <p className="mt-2 text-[11px] text-amber-200/80">

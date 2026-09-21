@@ -13,6 +13,8 @@ import {
   Target,
 } from "lucide-react";
 
+import { FullHealthNutritionPlan } from "./FullHealthNutritionPlan";
+
 import {
   ensureHealthPlan,
   getHealthDailyProgress,
@@ -536,26 +538,30 @@ export function HealthTodayWorkspace() {
       </section>
 
       {day ? (
-        <section className="grid gap-3 lg:grid-cols-3">
-          <PlanCard
-            title="Gym"
-            headline={`${day.training.title} · ${day.training.durationMinutes} min`}
-            body={
-              day.training.exercises.length
-                ? day.training.exercises.slice(0, 4).map((item) => `${item.name} — ${item.sets} × ${item.reps}`).join("\n")
-                : "Recovery / no resistance training"
-            }
-          />
-          <PlanCard
-            title="Diet"
-            headline={`${day.nutrition.proteinGrams || "—"}g protein · ${day.nutrition.hydrationLitres || "—"}L water`}
-            body={day.nutrition.meals.slice(0, 4).map((meal) => `${meal.time} ${meal.label}: ${meal.guidance}`).join("\n")}
-          />
-          <PlanCard
-            title="Recovery"
-            headline={`${day.sleep.targetHours}h sleep · ${day.stepsTarget.toLocaleString("en-IN")} steps`}
-            body={[...day.sleep.notes, `${day.meditation.durationMinutes} min ${day.meditation.type} meditation`].join("\n")}
-          />
+        <section className="space-y-3">
+          <div className="grid gap-3 lg:grid-cols-2">
+            <PlanCard
+              title="Gym"
+              headline={`${day.training.title} · ${day.training.durationMinutes} min`}
+              body={
+                day.training.exercises.length
+                  ? day.training.exercises.slice(0, 4).map((item) => `${item.name} — ${item.sets} × ${item.reps}`).join("\n")
+                  : "Recovery / no resistance training"
+              }
+            />
+            <PlanCard
+              title="Recovery"
+              headline={`${day.sleep.targetHours}h sleep · ${day.stepsTarget.toLocaleString("en-IN")} steps`}
+              body={[...day.sleep.notes, `${day.meditation.durationMinutes} min ${day.meditation.type} meditation`].join("\n")}
+            />
+          </div>
+          <div className="rounded-[22px] border border-white/10 bg-white/[0.025] p-5">
+            <div className="mb-4">
+              <p className="text-xs font-black uppercase tracking-[0.14em] text-[#C6FF32]">Diet · full AI plan</p>
+              <p className="mt-1 text-sm text-white/35">Same complete nutrition plan used by AI Plan → 7-Day Plan, without truncating meals or food details.</p>
+            </div>
+            <FullHealthNutritionPlan nutrition={day.nutrition} compact />
+          </div>
         </section>
       ) : null}
 
