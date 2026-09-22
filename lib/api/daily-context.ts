@@ -1,3 +1,18 @@
+
+export type DailyJournalPointerCategory =
+  | "work"
+  | "offline_reading"
+  | "conversation"
+  | "decision"
+  | "personal";
+
+export type DailyJournalPointerInput = {
+  dateKey: string;
+  category: DailyJournalPointerCategory;
+  note: string;
+  privacy?: "private_only" | "public_safe";
+};
+
 export type DailyContextPrivacy =
   | "private_only"
   | "internal_safe"
@@ -175,6 +190,24 @@ export function clearDailyContextPrivacy(dateKey: string, itemId: string) {
   });
 }
 
+
+export function upsertDailyJournalPointer(input: DailyJournalPointerInput) {
+  return request<DailyContext>("/daily-journal/pointers", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function removeDailyJournalPointer(
+  dateKey: string,
+  category: DailyJournalPointerCategory,
+) {
+  return request<DailyContext>("/daily-journal/pointers", {
+    method: "DELETE",
+    body: JSON.stringify({ dateKey, category }),
+  });
+}
+
 export function generateDailyJournal(dateKey: string, regenerate = false) {
   return request<DailyContextWorkspace & { generated?: boolean }>(
     "/daily-journal/generate",
@@ -219,6 +252,17 @@ export function approvePublicDailyJournal(journalEntryId: string) {
   return request<DailyJournalDraft>(
     `/daily-journal/${encodeURIComponent(journalEntryId)}/public/approve`,
     { method: "POST", body: "{}" },
+  );
+}
+
+
+export function approveAndPublishDailyJournalPair(dateKey: string) {
+  return request<DailyContextWorkspace & { published?: boolean }>(
+    "/daily-journal/publish-pair",
+    {
+      method: "POST",
+      body: JSON.stringify({ dateKey }),
+    },
   );
 }
 

@@ -120,6 +120,19 @@ export async function finishHobbySession(
   );
 }
 
+export async function completePlannedHobbySession(
+  hobbyId: string,
+  dateKey: string,
+): Promise<HobbyPracticeSession> {
+  return readResponse(
+    await adminFetch(`/hobbies/${encodeURIComponent(hobbyId)}/complete-planned`, {
+      method: "POST",
+      body: JSON.stringify({ dateKey }),
+    }),
+    "Unable to mark the planned hobby session complete.",
+  );
+}
+
 export async function logHobbySession(
   hobbyId: string,
   payload: LogHobbySessionPayload,

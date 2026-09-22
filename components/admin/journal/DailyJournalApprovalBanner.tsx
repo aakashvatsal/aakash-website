@@ -5,8 +5,7 @@ import { useEffect, useState } from "react";
 import { Check, Globe2, LockKeyhole, Sparkles } from "lucide-react";
 
 import {
-  approveDailyJournal,
-  approvePublicDailyJournal,
+  approveAndPublishDailyJournalPair,
   getDailyContextWorkspace,
   type DailyJournalDraft,
 } from "@/lib/api/daily-context";
@@ -18,137 +17,119 @@ function previousDayInIndia() {
     month: "2-digit",
     day: "2-digit",
   });
-  const todayParts = Object.fromEntries(
-    formatter.formatToParts(new Date()).map((part) => [part.type, part.value]),
-  );
-  const todayKey = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
+  const todayKey = formatter.format(new Date());
   const previous = new Date(
     new Date(`${todayKey}T00:00:00+05:30`).getTime() - 24 * 60 * 60 * 1000,
   );
-  const parts = Object.fromEntries(
-    formatter.formatToParts(previous).map((part) => [part.type, part.value]),
-  );
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  return formatter.format(previous);
 }
 
-function isPending(journal: DailyJournalDraft | null | undefined) {
-  return journal?.metadata?.approvalStatus === "pending_approval";
+function isWaiting(journal: DailyJournalDraft | null | undefined) {
+  return Boolean(journal && !journal.isPublished);
 }
 
 export function DailyJournalApprovalBanner() {
   const [privateJournal, setPrivateJournal] = useState<DailyJournalDraft | null>(null);
   const [publicJournal, setPublicJournal] = useState<DailyJournalDraft | null>(null);
-  const [busy, setBusy] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const dateKey = previousDayInIndia();
 
   useEffect(() => {
-    getDailyContextWorkspace(previousDayInIndia())
+    getDailyContextWorkspace(dateKey)
       .then((workspace) => {
-        setPrivateJournal(isPending(workspace.journal) ? workspace.journal : null);
-        setPublicJournal(isPending(workspace.publicJournal) ? workspace.publicJournal : null);
+        setPrivateJournal(isWaiting(workspace.journal) ? workspace.journal : null);
+        setPublicJournal(isWaiting(workspace.publicJournal) ? workspace.publicJournal : null);
       })
       .catch(() => {
         // Journal listing remains usable if the convenience approval panel fails.
       });
-  }, []);
+  }, [dateKey]);
 
   if (!privateJournal && !publicJournal) return null;
 
-  async function approve(kind: "private" | "public", journal: DailyJournalDraft) {
-    setBusy(kind);
+  async function publishBoth() {
+    setBusy(true);
     setError("");
     try {
-      const approved =
-        kind === "private"
-          ? await approveDailyJournal(journal._id)
-          : await approvePublicDailyJournal(journal._id);
-      if (approved.metadata?.approvalStatus !== "pending_approval") {
-        if (kind === "private") setPrivateJournal(null);
-        else setPublicJournal(null);
-      }
+      const result = await approveAndPublishDailyJournalPair(dateKey);
+      if (result.journal?.isPublished) setPrivateJournal(null);
+      if (result.publicJournal?.isPublished) setPublicJournal(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to approve journal.");
+      setError(reason instanceof Error ? reason.message : "Unable to publish journal copies.");
     } finally {
-      setBusy("");
+      setBusy(false);
     }
   }
+
+  const ready = Boolean(privateJournal && publicJournal);
 
   return (
     <section className="mt-8 rounded-[22px] border border-[#C6FF32]/25 bg-[#C6FF32]/[0.04] p-5">
       <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#C6FF32]">
-        <Sparkles className="h-4 w-4" /> HSAKAA journals ready
+        <Sparkles className="h-4 w-4" /> Yesterday’s journal is waiting for you
       </div>
       <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
-        The private journal uses your full captured day. The public draft is a separate artifact generated only from context already classified as public-safe.
+        HSAKAA prepared a private full journal and a separate public-safe copy. Add anything it missed and review privacy before giving the final publishing permission.
       </p>
       <Link
-        href="/admin/journal/daily"
+        href={`/admin/journal/daily?date=${encodeURIComponent(dateKey)}`}
         className="mt-3 inline-flex text-sm font-bold text-[#C6FF32] hover:underline"
       >
-        Review the Privacy Firewall →
+        Review yesterday →
       </Link>
       {error ? <p className="mt-3 text-sm text-red-300">{error}</p> : null}
 
       <div className="mt-5 grid gap-3 xl:grid-cols-2">
-        {privateJournal ? (
-          <ApprovalCard
-            journal={privateJournal}
-            kind="private"
-            busy={busy === "private"}
-            onApprove={() => approve("private", privateJournal)}
-          />
-        ) : null}
-        {publicJournal ? (
-          <ApprovalCard
-            journal={publicJournal}
-            kind="public"
-            busy={busy === "public"}
-            onApprove={() => approve("public", publicJournal)}
-          />
-        ) : null}
+        <StatusCard
+          journal={privateJournal}
+          icon={<LockKeyhole className="h-4 w-4 text-[#C6FF32]" />}
+          label="Private full copy"
+        />
+        <StatusCard
+          journal={publicJournal}
+          icon={<Globe2 className="h-4 w-4 text-[#C6FF32]" />}
+          label="Public-safe copy"
+        />
       </div>
+
+      <button
+        type="button"
+        onClick={() => void publishBoth()}
+        disabled={!ready || busy}
+        className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#C6FF32] px-4 text-sm font-black text-[#030608] disabled:opacity-40"
+      >
+        <Check className="h-4 w-4" />
+        {busy ? "Publishing…" : "Approve & publish both copies"}
+      </button>
     </section>
   );
 }
 
-function ApprovalCard({
+function StatusCard({
   journal,
-  kind,
-  busy,
-  onApprove,
+  icon,
+  label,
 }: {
-  journal: DailyJournalDraft;
-  kind: "private" | "public";
-  busy: boolean;
-  onApprove: () => void;
+  journal: DailyJournalDraft | null;
+  icon: React.ReactNode;
+  label: string;
 }) {
-  const Icon = kind === "private" ? LockKeyhole : Globe2;
   return (
     <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
       <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-white/45">
-        <Icon className="h-4 w-4 text-[#C6FF32]" />
-        {kind === "private" ? "Private daily journal" : "Public-safe Open Notebook draft"}
+        {icon} {label}
       </div>
-      <h2 className="mt-3 text-lg font-black text-white">{journal.title}</h2>
-      <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
-        {journal.highlight || journal.content || "Generated and waiting for approval."}
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={`/admin/journal/${journal._id}`}
-          className="inline-flex min-h-10 items-center rounded-xl border border-white/10 px-3 text-sm font-bold text-white/75"
-        >
-          Read journal
-        </Link>
-        <button
-          type="button"
-          onClick={onApprove}
-          disabled={busy}
-          className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#C6FF32] px-3 text-sm font-black text-[#030608] disabled:opacity-60"
-        >
-          <Check className="h-4 w-4" /> {busy ? "Approving…" : "Approve"}
-        </button>
-      </div>
+      {journal ? (
+        <>
+          <h2 className="mt-3 text-lg font-black text-white">{journal.title}</h2>
+          <p className="mt-2 line-clamp-3 text-sm leading-6 text-white/55">
+            {journal.highlight || journal.content || "Prepared and waiting for owner approval."}
+          </p>
+        </>
+      ) : (
+        <p className="mt-3 text-sm text-amber-300">Not ready yet. Open yesterday’s review.</p>
+      )}
     </div>
   );
 }

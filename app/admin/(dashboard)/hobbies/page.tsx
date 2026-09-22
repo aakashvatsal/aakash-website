@@ -16,7 +16,7 @@ export default async function HobbiesPage() {
         <AdminPageHeader
           eyebrow="Personal OS · Deliberate Practice"
           title="Hobbies"
-          description="Track what you are actively learning, real practice time, curriculum progress, the next useful session, and when you have capacity for the next hobby."
+          description="Five active hobbies in one six-month growth season, with a maximum of two hobbies per day, structured curricula, and owner-confirmed completion only."
         />
         <HobbiesManager
           initialOverview={overview}

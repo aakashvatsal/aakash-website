@@ -90,6 +90,7 @@ export type HobbyPracticeSession = {
   difficulty?: number;
   enjoyment?: number;
   source: string;
+  ownerConfirmed?: boolean;
   evidence?: Array<{
     type: string;
     url?: string;
@@ -140,7 +141,7 @@ export type HobbyPracticePlan = {
   generatedAt: string;
   weekStart: string;
   weekEnd: string;
-  source: "tasks_plus_hobby_preferences";
+  source: "tasks_plus_hobby_preferences" | "six_month_season_plus_tasks";
   calendarIntegration: "not_connected_in_backend";
   note: string;
   slots: Array<{
@@ -192,6 +193,10 @@ export type HobbyCard = {
   startedAt?: string;
   targetDate?: string;
   targetHorizonWeeks?: number;
+  seasonKey?: string;
+  seasonLabel?: string;
+  seasonOrder?: number;
+  ownerCompletionRequired?: boolean;
   weeklyTargetMinutes: number;
   targetSessionsPerWeek: number;
   recommendedSessionMinutes: number;
@@ -250,6 +255,19 @@ export type HobbyBacklogItem = {
 export type HobbiesOverview = {
   generatedAt: string;
   trackingNote: string;
+  season: {
+    key: string;
+    label: string;
+    startDate: string;
+    endDate: string;
+    maxActiveHobbies: number;
+    maxHobbiesPerDay: number;
+    activeHobbies: number;
+    ownerCompletionRequired: boolean;
+    elapsedDays: number;
+    totalDays: number;
+    progressPercent: number;
+  };
   active: HobbyCard[];
   backlog: HobbyBacklogItem[];
   doNext: null | {

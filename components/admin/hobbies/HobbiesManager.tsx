@@ -21,7 +21,6 @@ import {
   Save,
   Search,
   ShieldCheck,
-  Sparkles,
   Square,
   Target,
   Trash2,
@@ -31,6 +30,7 @@ import {
 import {
   advanceHobby,
   archiveHobby,
+  completePlannedHobbySession,
   createHobby,
   finishHobbySession,
   generateHobbyReview,
@@ -62,6 +62,23 @@ function minutesLabel(minutes: number) {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
+}
+
+function formatSlotTime(value: string) {
+  return new Date(value).toLocaleTimeString("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
+function formatSlotDay(dateKey: string) {
+  return new Date(`${dateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "short",
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 function paceLabel(pace: HobbyCard["pace"]) {
@@ -112,6 +129,7 @@ export function HobbiesManager({
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [now, setNow] = useState(() => new Date());
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [quickMinutes, setQuickMinutes] = useState<Record<string, string>>({});
@@ -119,7 +137,7 @@ export function HobbiesManager({
   const [showAddHobby, setShowAddHobby] = useState(false);
   const [newHobby, setNewHobby] = useState({
     name: "",
-    status: "active",
+    status: "backlog",
     category: "other",
     intensity: "secondary",
     currentSkillLevel: "",
@@ -145,10 +163,76 @@ export function HobbiesManager({
     nextAction: "",
   });
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const linkedIds = useMemo(
     () => new Set(initialOverview.active.flatMap((hobby) => hobby.linkedLibraryItemIds ?? [])),
     [initialOverview.active],
   );
+  const practiceDays = useMemo(() => {
+    const grouped = new Map<string, HobbyPracticePlan["slots"]>();
+    for (const slot of initialPracticePlan.slots) {
+      const current = grouped.get(slot.dateKey) ?? [];
+      current.push(slot);
+      grouped.set(slot.dateKey, current);
+    }
+    return [...grouped.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([dateKey, slots]) => ({
+        dateKey,
+        slots: [...slots].sort((a, b) => a.startAt.localeCompare(b.startAt)),
+      }));
+  }, [initialPracticePlan.slots]);
+  const todayDateKey = now.toLocaleDateString("en-CA", {
+    timeZone: "Asia/Kolkata",
+  });
+  const weeklyTargetSessions = useMemo(
+    () => initialOverview.active.reduce((sum, hobby) => sum + hobby.targetSessionsPerWeek, 0),
+    [initialOverview.active],
+  );
+  const weeklyCommitmentBreakdown = useMemo(
+    () =>
+      initialOverview.active
+        .map((hobby) => `${hobby.name} ${minutesLabel(hobby.weeklyTargetMinutes)}`)
+        .join(" · "),
+    [initialOverview.active],
+  );
+  const scheduledAction = useMemo(() => {
+    const slots = [...initialPracticePlan.slots].sort((a, b) => a.startAt.localeCompare(b.startAt));
+    const todaySlots = slots.filter((slot) => slot.dateKey === todayDateKey);
+    const nowMs = now.getTime();
+    const dueToday = todaySlots.find((slot) => new Date(slot.startAt).getTime() <= nowMs);
+    if (dueToday) {
+      return {
+        slot: dueToday,
+        state: "due" as const,
+        label: `Due now · planned ${formatSlotTime(dueToday.startAt)}`,
+        isToday: true,
+      };
+    }
+    const upcomingToday = todaySlots.find((slot) => new Date(slot.startAt).getTime() > nowMs);
+    if (upcomingToday) {
+      return {
+        slot: upcomingToday,
+        state: "upcoming" as const,
+        label: `Today · ${formatSlotTime(upcomingToday.startAt)}`,
+        isToday: true,
+      };
+    }
+    const future = slots.find((slot) => slot.dateKey > todayDateKey);
+    if (future) {
+      return {
+        slot: future,
+        state: "future" as const,
+        label: `${formatSlotDay(future.dateKey)} · ${formatSlotTime(future.startAt)}`,
+        isToday: false,
+      };
+    }
+    return null;
+  }, [initialPracticePlan.slots, now, todayDateKey]);
 
   function run(action: () => Promise<unknown>, success: string) {
     setError(null);
@@ -196,7 +280,7 @@ export function HobbiesManager({
         setShowAddHobby(false);
         setNewHobby({
           name: "",
-          status: "active",
+          status: "backlog",
           category: "other",
           intensity: "secondary",
           currentSkillLevel: "",
@@ -609,66 +693,93 @@ export function HobbiesManager({
         )}
       </section>
 
+      <section className="rounded-[28px] border border-[#C6FF32]/15 bg-[#C6FF32]/[0.035] p-5 md:p-6">
+        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[#C6FF32]/70">
+              <CalendarDays className="h-4 w-4" /> Six-month growth season
+            </div>
+            <h2 className="mt-3 text-2xl font-semibold text-white">{initialOverview.season.label}</h2>
+            <p className="mt-2 text-sm leading-6 text-white/55">
+              Five active hobbies only. HSAKAA may plan and coach, but a session counts only when you explicitly finish it or press Mark complete. No more than {initialOverview.season.maxHobbiesPerDay} hobbies are scheduled on any day.
+            </p>
+          </div>
+          <div className="min-w-[230px] rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="flex items-center justify-between text-xs text-white/45">
+              <span>{initialOverview.season.startDate}</span>
+              <span>{initialOverview.season.endDate}</span>
+            </div>
+            <div className="mt-3"><Progress value={initialOverview.season.progressPercent} /></div>
+            <p className="mt-2 text-xs text-white/35">{initialOverview.season.progressPercent}% of the season elapsed · {initialOverview.season.activeHobbies}/{initialOverview.season.maxActiveHobbies} active</p>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-4 md:grid-cols-4">
-        <Metric label="Active tracks" value={String(initialOverview.active.length)} hint="Keep serious acquisition tracks limited" />
+        <Metric label="Season hobbies" value={`${initialOverview.active.length}/${initialOverview.season.maxActiveHobbies}`} hint="Five at a time for six months" />
         <Metric
-          label="This week"
+          label="Completed this week"
           value={minutesLabel(initialOverview.learningLoad.weeklyMinutes)}
-          hint={`${minutesLabel(initialOverview.learningLoad.weeklyTargetMinutes)} target`}
+          hint="Only owner-confirmed practice counts"
         />
         <Metric
-          label="Practice sessions"
-          value={String(initialOverview.learningLoad.sessionsThisWeek)}
-          hint={`${initialOverview.learningLoad.load} deliberate-practice load`}
+          label="Weekly plan"
+          value={`${weeklyTargetSessions} sessions`}
+          hint={`${minutesLabel(initialOverview.learningLoad.weeklyTargetMinutes)} total · max 2/day`}
         />
         <Metric
-          label="Next hobby"
-          value={initialOverview.nextHobby.hobby?.name ?? "Not selected"}
-          hint={
-            initialOverview.nextHobby.ready
-              ? "Ready when you choose to start"
-              : initialOverview.nextHobby.earliestStartDate
-                ? `Revisit around ${initialOverview.nextHobby.earliestStartDate}`
-                : "Hold for now"
-          }
+          label="Season ends"
+          value={initialOverview.season.endDate}
+          hint="Review all five before rotating the next season"
         />
       </section>
+
+      <div className="rounded-2xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-xs leading-5 text-white/35">
+        <span className="font-medium text-white/55">Weekly commitment:</span> {weeklyCommitmentBreakdown}. This is the planned practice load, not a completion score.
+      </div>
 
       <section className="rounded-[28px] border border-[#C6FF32]/15 bg-[#C6FF32]/[0.045] p-5 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs uppercase tracking-[0.18em] text-[#C6FF32]/70">
-              <Sparkles className="h-4 w-4" /> What should I do next?
+              <Clock3 className="h-4 w-4" /> What should I do now?
             </div>
-            {initialOverview.doNext ? (
+            {scheduledAction ? (
               <>
-                <h2 className="mt-3 text-xl font-semibold text-white">
-                  {initialOverview.doNext.name} · {initialOverview.doNext.recommendedMinutes} min
+                <p className="mt-3 text-xs font-medium uppercase tracking-[0.14em] text-[#C6FF32]/65">{scheduledAction.label}</p>
+                <h2 className="mt-2 text-xl font-semibold text-white">
+                  {scheduledAction.slot.hobbyName} · {scheduledAction.slot.minutes} min
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-white/65">
-                  {initialOverview.doNext.action}
+                  {scheduledAction.slot.focus}
                 </p>
-                <p className="mt-2 text-xs text-white/35">{initialOverview.doNext.reason}</p>
+                <p className="mt-2 text-xs text-white/35">
+                  {scheduledAction.isToday
+                    ? scheduledAction.state === "due"
+                      ? "This comes from today’s weekly schedule. It stays due until you explicitly complete the session."
+                      : "This is the next hobby actually scheduled for today, based on its planned time."
+                    : "No hobby session is scheduled for the rest of today. This is your next planned session."}
+                </p>
               </>
             ) : (
               <>
-                <h2 className="mt-3 text-xl font-semibold text-white">No deliberate practice is due right now.</h2>
-                <p className="mt-2 text-sm text-white/50">Your current weekly targets are already covered or no active track needs attention today.</p>
+                <h2 className="mt-3 text-xl font-semibold text-white">Nothing else is scheduled right now.</h2>
+                <p className="mt-2 text-sm text-white/50">There is no remaining hobby slot in the current weekly plan. Refresh after the next planning window if needed.</p>
               </>
             )}
           </div>
-          {initialOverview.doNext && (
+          {scheduledAction?.isToday && (
             <button
               disabled={pending}
               onClick={() =>
                 run(
-                  () => startHobbySession(initialOverview.doNext!.hobbyId, initialOverview.doNext!.action),
-                  `${initialOverview.doNext!.name} practice started.`,
+                  () => startHobbySession(scheduledAction.slot.hobbyId, scheduledAction.slot.focus),
+                  `${scheduledAction.slot.hobbyName} practice started.`,
                 )
               }
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#C6FF32] px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-50"
             >
-              <Play className="h-4 w-4" /> Start practice
+              <Play className="h-4 w-4" /> {scheduledAction.state === "due" ? "Start now" : "Start early"}
             </button>
           )}
         </div>
@@ -700,26 +811,50 @@ export function HobbiesManager({
         </div>
 
         {initialPracticePlan.slots.length ? (
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {initialPracticePlan.slots.map((slot) => (
-              <div
-                key={`${slot.hobbyId}:${slot.startAt}`}
-                className="rounded-2xl border border-white/[0.08] bg-black/20 p-4"
-              >
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {practiceDays.map((day) => (
+              <div key={day.dateKey} className="rounded-2xl border border-white/[0.08] bg-black/20 p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-white">{slot.hobbyName}</p>
-                  <span className="text-xs text-[#C6FF32]">{slot.minutes} min</span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {new Date(`${day.dateKey}T12:00:00+05:30`).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "Asia/Kolkata" })}
+                    </p>
+                    <p className="mt-1 text-[11px] text-white/30">{day.slots.length}/2 hobby slots</p>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-white/35">max 2/day</span>
                 </div>
-                <p className="mt-1 text-xs text-white/35">
-                  {new Date(slot.startAt).toLocaleString("en-IN", {
-                    weekday: "short",
-                    hour: "numeric",
-                    minute: "2-digit",
-                    timeZone: "Asia/Kolkata",
+                <div className="mt-4 space-y-3">
+                  {day.slots.map((slot) => {
+                    const canComplete = slot.dateKey <= todayDateKey;
+                    return (
+                      <div key={`${slot.hobbyId}:${slot.startAt}`} className="rounded-xl border border-white/[0.07] bg-white/[0.025] p-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-white">{slot.hobbyName}</p>
+                            <p className="mt-1 text-xs text-white/35">
+                              {new Date(slot.startAt).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} · {slot.minutes} min
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={pending || !canComplete}
+                            onClick={() =>
+                              run(
+                                () => completePlannedHobbySession(slot.hobbyId, slot.dateKey),
+                                `${slot.hobbyName} marked complete.`,
+                              )
+                            }
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[#C6FF32]/20 px-2.5 py-1.5 text-[11px] font-medium text-[#DFFF87] disabled:border-white/10 disabled:text-white/25"
+                          >
+                            <Check className="h-3.5 w-3.5" /> {canComplete ? "Mark complete" : "Upcoming"}
+                          </button>
+                        </div>
+                        <p className="mt-3 text-sm leading-5 text-white/60">{slot.focus}</p>
+                        <p className="mt-2 text-xs leading-5 text-white/30">{slot.reason}</p>
+                      </div>
+                    );
                   })}
-                </p>
-                <p className="mt-3 text-sm leading-5 text-white/60">{slot.focus}</p>
-                <p className="mt-2 text-xs leading-5 text-white/30">{slot.reason}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -731,7 +866,7 @@ export function HobbiesManager({
 
         <div className="mt-4 flex items-center gap-2 text-xs text-white/30">
           <ShieldCheck className="h-3.5 w-3.5" />
-          Google Calendar is not connected to this backend yet; HSAKAA currently uses Tasks workload + your preferred practice days/time windows and never claims calendar availability.
+          Only your explicit Finish, Log actual min, or Mark complete action creates completed practice. HSAKAA suggestions, synced Tasks and elapsed schedule time never do. Google Calendar availability is not inferred.
         </div>
       </section>
 
@@ -875,32 +1010,102 @@ export function HobbiesManager({
                 </div>
               )}
 
-              <details className="mt-5 border-t border-white/[0.07] pt-4">
-                <summary className="cursor-pointer text-sm font-medium text-white/60">Curriculum & progression</summary>
-                <div className="mt-4 space-y-3">
-                  {hobby.curriculum.map((stage) => (
-                    <div key={stage.key} className="rounded-2xl border border-white/[0.07] bg-black/15 p-3.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          {stage.status === "completed" ? <Check className="h-4 w-4 text-[#C6FF32]" /> : <div className="h-4 w-4 rounded-full border border-white/20" />}
-                          <p className="text-sm font-medium text-white/75">{stage.order}. {stage.title}</p>
-                        </div>
-                        <span className="text-[10px] uppercase tracking-[0.12em] text-white/30">{stage.status}</span>
-                      </div>
-                      {stage.objective && <p className="mt-2 text-xs leading-5 text-white/40">{stage.objective}</p>}
-                    </div>
-                  ))}
-                  {hobby.status === "active" && (
-                    <button
-                      disabled={pending}
-                      onClick={() => run(() => advanceHobby(hobby._id), `${hobby.name} moved to the next curriculum stage.`)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-[#C6FF32]/20 px-3 py-2 text-xs text-[#DFFF87] disabled:opacity-50"
-                    >
-                      Complete current stage <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+              <section className="mt-5 border-t border-white/[0.07] pt-5">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.14em] text-white/30">26-week curriculum</p>
+                    <h3 className="mt-1 text-base font-semibold text-white/75">Step-by-step progression</h3>
+                  </div>
+                  <span className="text-xs text-white/30">{hobby.completedStages}/{hobby.totalStages} stages completed</span>
                 </div>
-              </details>
+
+                <div className="mt-4 space-y-3">
+                  {hobby.curriculum.map((stage, stageIndex) => {
+                    const startWeek = hobby.curriculum
+                      .slice(0, stageIndex)
+                      .reduce((sum, item) => sum + (item.targetWeeks ?? 0), 1);
+                    const endWeek = startWeek + Math.max(1, stage.targetWeeks ?? 1) - 1;
+                    const isCurrent = stage.status === "current";
+                    const isCompleted = stage.status === "completed";
+                    return (
+                      <div
+                        key={stage.key}
+                        className={`rounded-2xl border p-4 ${
+                          isCurrent
+                            ? "border-[#C6FF32]/25 bg-[#C6FF32]/[0.055]"
+                            : isCompleted
+                              ? "border-white/[0.09] bg-white/[0.025]"
+                              : "border-white/[0.06] bg-black/15 opacity-70"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex gap-3">
+                            <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${
+                              isCompleted
+                                ? "border-[#C6FF32]/30 bg-[#C6FF32]/10 text-[#DFFF87]"
+                                : isCurrent
+                                  ? "border-[#C6FF32]/35 text-[#C6FF32]"
+                                  : "border-white/15 text-white/30"
+                            }`}>
+                              {isCompleted ? <Check className="h-3.5 w-3.5" /> : stage.order}
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-[0.13em] text-white/30">
+                                Step {stage.order} · Weeks {startWeek}–{endWeek}
+                              </p>
+                              <p className="mt-1 text-sm font-semibold text-white/80">{stage.title}</p>
+                            </div>
+                          </div>
+                          <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] ${
+                            isCurrent
+                              ? "border-[#C6FF32]/25 text-[#DFFF87]"
+                              : isCompleted
+                                ? "border-white/10 text-white/45"
+                                : "border-white/[0.07] text-white/25"
+                          }`}>
+                            {isCurrent ? "Current" : isCompleted ? "Completed" : "Locked"}
+                          </span>
+                        </div>
+
+                        {stage.objective && <p className="mt-3 text-sm leading-6 text-white/55">{stage.objective}</p>}
+
+                        <div className="mt-4 grid gap-3 md:grid-cols-2">
+                          <div className="rounded-xl border border-white/[0.06] bg-black/15 p-3">
+                            <p className="text-[10px] uppercase tracking-[0.12em] text-white/25">What to practice</p>
+                            <ol className="mt-2 space-y-1.5 text-xs leading-5 text-white/45">
+                              {stage.exercises.map((exercise, index) => (
+                                <li key={exercise}>{index + 1}. {exercise}</li>
+                              ))}
+                            </ol>
+                          </div>
+                          <div className="rounded-xl border border-white/[0.06] bg-black/15 p-3">
+                            <p className="text-[10px] uppercase tracking-[0.12em] text-white/25">Complete this step only when</p>
+                            <ul className="mt-2 space-y-1.5 text-xs leading-5 text-white/45">
+                              {stage.completionCriteria.map((criterion) => (
+                                <li key={criterion}>• {criterion}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+
+                        {stage.focusAreas?.length > 0 && (
+                          <p className="mt-3 text-[11px] leading-5 text-white/30">Focus: {stage.focusAreas.join(" · ")}</p>
+                        )}
+
+                        {isCurrent && hobby.status === "active" && (
+                          <button
+                            disabled={pending}
+                            onClick={() => run(() => advanceHobby(hobby._id), `${hobby.name} moved to the next curriculum stage.`)}
+                            className="mt-4 inline-flex items-center gap-2 rounded-xl border border-[#C6FF32]/20 px-3 py-2 text-xs text-[#DFFF87] disabled:opacity-50"
+                          >
+                            I completed this step <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
 
               <details className="mt-4 border-t border-white/[0.07] pt-4">
                 <summary className="cursor-pointer text-sm font-medium text-white/60">Library resources</summary>

@@ -1,11 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  BookOpen,
+  BriefcaseBusiness,
   Check,
   Globe2,
+  Heart,
+  Lightbulb,
   LockKeyhole,
+  MessageCircle,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -13,19 +18,21 @@ import {
 } from "lucide-react";
 
 import {
-  approveDailyJournal,
-  approvePublicDailyJournal,
+  approveAndPublishDailyJournalPair,
   clearDailyContextPrivacy,
   generateDailyJournal,
   getDailyContextWorkspace,
   getJournalIntelligence,
   regeneratePublicDailyJournal,
   refreshDailyContext,
+  removeDailyJournalPointer,
   updateDailyContextPrivacy,
+  upsertDailyJournalPointer,
   type DailyContextItem,
   type DailyContextPrivacy,
   type DailyContextWorkspace,
   type DailyJournalDraft,
+  type DailyJournalPointerCategory,
   type JournalIntelligence,
 } from "@/lib/api/daily-context";
 
@@ -38,6 +45,99 @@ const PRIVACY_OPTIONS: Array<{
   { value: "public_safe", label: "Public safe" },
   { value: "needs_review", label: "Needs review" },
 ];
+
+const POINTERS: Array<{
+  category: DailyJournalPointerCategory;
+  title: string;
+  prompt: string;
+  placeholder: string;
+  icon: React.ReactNode;
+}> = [
+  {
+    category: "work",
+    title: "Work worth remembering",
+    prompt:
+      "Anything important at 8lete, Frayto or HSAKAA that Tasks, meetings or company records did not capture?",
+    placeholder:
+      "Example: We changed the approach to… The main unresolved issue was… I spent most of the afternoon on…",
+    icon: <BriefcaseBusiness className="h-4 w-4" />,
+  },
+  {
+    category: "offline_reading",
+    title: "Offline reading",
+    prompt:
+      "Did you read a physical/offline book that Library could not see? Add the title and what mattered, not just the fact that you read.",
+    placeholder:
+      "Example: Read 25 minutes of … The idea I kept thinking about was…",
+    icon: <BookOpen className="h-4 w-4" />,
+  },
+  {
+    category: "conversation",
+    title: "Conversation or meeting",
+    prompt:
+      "Was there a conversation, meeting or person interaction worth remembering that is not already captured?",
+    placeholder:
+      "Example: Spoke with … about … The useful tension / insight was…",
+    icon: <MessageCircle className="h-4 w-4" />,
+  },
+  {
+    category: "decision",
+    title: "Decision or unresolved thought",
+    prompt:
+      "Did you make a decision, change your mind, notice a trade-off, or leave an important question unresolved?",
+    placeholder:
+      "Example: I decided to… because… I am still unsure about…",
+    icon: <Lightbulb className="h-4 w-4" />,
+  },
+  {
+    category: "personal",
+    title: "Personal context HSAKAA missed",
+    prompt:
+      "Anything meaningful about the day that apps and integrations simply could not know?",
+    placeholder:
+      "Example: A quiet moment, something funny, a frustration, a small win, or something I want future-me to remember.",
+    icon: <Heart className="h-4 w-4" />,
+  },
+];
+
+type PointerDraft = {
+  note: string;
+  privacy: "private_only" | "public_safe";
+};
+
+type PointerDrafts = Record<DailyJournalPointerCategory, PointerDraft>;
+
+function emptyPointerDrafts(): PointerDrafts {
+  return {
+    work: { note: "", privacy: "private_only" },
+    offline_reading: { note: "", privacy: "private_only" },
+    conversation: { note: "", privacy: "private_only" },
+    decision: { note: "", privacy: "private_only" },
+    personal: { note: "", privacy: "private_only" },
+  };
+}
+
+function pointerDraftsFromContext(items: DailyContextItem[]): PointerDrafts {
+  const drafts = emptyPointerDrafts();
+  for (const item of items) {
+    if (item.source !== "owner") continue;
+    const category = item.metadata?.category;
+    if (
+      category !== "work" &&
+      category !== "offline_reading" &&
+      category !== "conversation" &&
+      category !== "decision" &&
+      category !== "personal"
+    ) {
+      continue;
+    }
+    drafts[category] = {
+      note: item.summary ?? "",
+      privacy: item.privacy === "public_safe" ? "public_safe" : "private_only",
+    };
+  }
+  return drafts;
+}
 
 export function DailyJournalWorkspace({
   initialWorkspace,
@@ -53,15 +153,26 @@ export function DailyJournalWorkspace({
   const [monthly, setMonthly] = useState(initialMonthly);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [pointerDrafts, setPointerDrafts] = useState<PointerDrafts>(() =>
+    pointerDraftsFromContext(initialWorkspace.context.items),
+  );
 
   const context = workspace.context;
   const publicSafeCount = context.privacyCounts.public_safe ?? 0;
   const needsReviewCount = context.privacyCounts.needs_review ?? 0;
   const publicStale = workspace.publicJournal?.metadata?.publicDraftStale === true;
+  const bothPublished =
+    workspace.journal?.isPublished === true &&
+    workspace.publicJournal?.isPublished === true;
+
+  useEffect(() => {
+    setPointerDrafts(pointerDraftsFromContext(context.items));
+  }, [context.items]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, DailyContextItem[]>();
     for (const item of context.items) {
+      if (item.source === "owner") continue;
       const rows = groups.get(item.source) ?? [];
       rows.push(item);
       groups.set(item.source, rows);
@@ -93,10 +204,61 @@ export function DailyJournalWorkspace({
     }
   }
 
+  async function savePointersAndRebuild() {
+    setBusy("pointers");
+    setError("");
+    try {
+      const existingCategories = new Set(
+        context.items
+          .filter((item) => item.source === "owner")
+          .map((item) => item.metadata?.category)
+          .filter((value): value is DailyJournalPointerCategory =>
+            value === "work" ||
+            value === "offline_reading" ||
+            value === "conversation" ||
+            value === "decision" ||
+            value === "personal",
+          ),
+      );
+
+      for (const pointer of POINTERS) {
+        const draft = pointerDrafts[pointer.category];
+        const note = draft.note.trim();
+        if (note) {
+          await upsertDailyJournalPointer({
+            dateKey: context.dateKey,
+            category: pointer.category,
+            note,
+            privacy: draft.privacy,
+          });
+        } else if (existingCategories.has(pointer.category)) {
+          await removeDailyJournalPointer(context.dateKey, pointer.category);
+        }
+      }
+
+      await generateDailyJournal(context.dateKey, true);
+      await reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to save journal pointers.");
+    } finally {
+      setBusy("");
+    }
+  }
+
   async function changeDate(nextDate: string) {
     if (!nextDate) return;
     window.location.href = `/admin/journal/daily?date=${encodeURIComponent(nextDate)}`;
   }
+
+  const pairBlockedReason = !workspace.journal
+    ? "Prepare the private draft first."
+    : !workspace.publicJournal
+      ? "A public-safe draft is required. Mark at least one source Public safe, then regenerate."
+      : needsReviewCount > 0
+        ? "Resolve every Needs review privacy item first."
+        : publicStale
+          ? "The public draft is stale. Regenerate it first."
+          : null;
 
   return (
     <div className="space-y-6">
@@ -104,11 +266,11 @@ export function DailyJournalWorkspace({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#C6FF32]">
-              <ShieldCheck className="h-4 w-4" /> Privacy firewall
+              <ShieldCheck className="h-4 w-4" /> Previous-day review
             </div>
             <h2 className="mt-2 text-2xl font-black text-white">{context.dateKey}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
-              Private synthesis sees the complete factual day. The public draft can only use items explicitly marked public-safe.
+              HSAKAA prepares this day from Personal OS activity. Add anything integrations could not see, then review privacy before giving the single final publishing permission.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -124,7 +286,7 @@ export function DailyJournalWorkspace({
               disabled={Boolean(busy)}
               className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-bold text-white/75 disabled:opacity-50"
             >
-              <RefreshCw className="h-4 w-4" /> Refresh context
+              <RefreshCw className="h-4 w-4" /> Refresh captured activity
             </button>
           </div>
         </div>
@@ -143,45 +305,135 @@ export function DailyJournalWorkspace({
         ) : null}
       </section>
 
+      <section className="rounded-[24px] border border-[#C6FF32]/20 bg-[#C6FF32]/[0.035] p-5 sm:p-6">
+        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#C6FF32]">
+          <Sparkles className="h-4 w-4" /> What might HSAKAA have missed?
+        </div>
+        <h2 className="mt-2 text-xl font-black text-white">Add the parts of yesterday that software cannot reliably know</h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
+          These are optional. Leave a field blank when there is nothing to add. Each note stays private unless you explicitly choose Public safe.
+        </p>
+
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          {POINTERS.map((pointer) => {
+            const draft = pointerDrafts[pointer.category];
+            return (
+              <div key={pointer.category} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center gap-2 text-sm font-black text-white">
+                  <span className="text-[#C6FF32]">{pointer.icon}</span>
+                  {pointer.title}
+                </div>
+                <p className="mt-2 text-sm leading-6 text-white/45">{pointer.prompt}</p>
+                <textarea
+                  value={draft.note}
+                  onChange={(event) =>
+                    setPointerDrafts((current) => ({
+                      ...current,
+                      [pointer.category]: {
+                        ...current[pointer.category],
+                        note: event.target.value,
+                      },
+                    }))
+                  }
+                  placeholder={pointer.placeholder}
+                  rows={4}
+                  className="mt-3 w-full rounded-xl border border-white/10 bg-[#070b0d] px-3 py-3 text-sm leading-6 text-white outline-none placeholder:text-white/20 focus:border-[#C6FF32]/40"
+                />
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <span className="text-xs text-white/35">Use this note in:</span>
+                  <select
+                    value={draft.privacy}
+                    onChange={(event) =>
+                      setPointerDrafts((current) => ({
+                        ...current,
+                        [pointer.category]: {
+                          ...current[pointer.category],
+                          privacy: event.target.value as "private_only" | "public_safe",
+                        },
+                      }))
+                    }
+                    className="min-h-9 rounded-lg border border-white/10 bg-[#070b0d] px-2 text-xs font-bold text-white"
+                  >
+                    <option value="private_only">Private copy only</option>
+                    <option value="public_safe">Private + public-safe copy</option>
+                  </select>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void savePointersAndRebuild()}
+          disabled={Boolean(busy)}
+          className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#C6FF32] px-4 text-sm font-black text-[#030608] disabled:opacity-50"
+        >
+          <RefreshCw className="h-4 w-4" />
+          {busy === "pointers" ? "Saving and rebuilding…" : "Save additions & rebuild both drafts"}
+        </button>
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-2">
         <JournalDraftCard
-          title="Private daily journal"
+          title="Private full journal"
           icon={<LockKeyhole className="h-4 w-4" />}
           journal={workspace.journal}
           busy={busy}
-          actionLabel={workspace.journal ? "Approve private journal" : "Generate journal"}
-          onAction={() =>
-            workspace.journal
-              ? run("approve-private", () => approveDailyJournal(workspace.journal!._id))
-              : run("generate", () => generateDailyJournal(context.dateKey))
-          }
+          emptyActionLabel="Prepare both drafts"
+          onEmptyAction={() => run("generate", () => generateDailyJournal(context.dateKey))}
           secondaryLabel="Regenerate private + public"
           onSecondary={() => run("regenerate", () => generateDailyJournal(context.dateKey, true))}
         />
         <JournalDraftCard
-          title="Public-safe Open Notebook"
+          title="Public-safe journal"
           icon={<Globe2 className="h-4 w-4" />}
           journal={workspace.publicJournal}
           busy={busy}
           stale={publicStale}
-          disabled={needsReviewCount > 0 || publicStale}
-          actionLabel="Approve public draft"
-          onAction={() =>
-            workspace.publicJournal
-              ? run("approve-public", () => approvePublicDailyJournal(workspace.publicJournal!._id))
-              : run("regenerate-public", () => regeneratePublicDailyJournal(context.dateKey))
-          }
+          emptyActionLabel="Generate public-safe draft"
+          onEmptyAction={() => run("regenerate-public", () => regeneratePublicDailyJournal(context.dateKey))}
           secondaryLabel="Regenerate public draft"
           onSecondary={() => run("regenerate-public", () => regeneratePublicDailyJournal(context.dateKey))}
         />
       </section>
 
+      <section className={`rounded-[24px] border p-5 sm:p-6 ${bothPublished ? "border-[#C6FF32]/30 bg-[#C6FF32]/[0.05]" : "border-white/10 bg-white/[0.025]"}`}>
+        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#C6FF32]">
+          <Check className="h-4 w-4" /> Final owner permission
+        </div>
+        <h2 className="mt-2 text-xl font-black text-white">
+          {bothPublished ? "Both journal copies are published" : "Approve & publish both copies with one click"}
+        </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-white/55">
+          Your click is the approval. The private copy becomes the final owner-only journal inside Personal OS. The public copy is published to the public journal and can use only sources you explicitly classified Public safe.
+        </p>
+        {pairBlockedReason && !bothPublished ? (
+          <p className="mt-3 text-sm font-bold text-amber-300">{pairBlockedReason}</p>
+        ) : null}
+        {!bothPublished ? (
+          <button
+            type="button"
+            onClick={() => run("publish-pair", () => approveAndPublishDailyJournalPair(context.dateKey))}
+            disabled={Boolean(busy) || Boolean(pairBlockedReason)}
+            className="mt-5 inline-flex min-h-12 items-center gap-2 rounded-xl bg-[#C6FF32] px-5 text-sm font-black text-[#030608] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Check className="h-4 w-4" />
+            {busy === "publish-pair" ? "Publishing…" : "Approve & publish private + public"}
+          </button>
+        ) : (
+          <div className="mt-4 inline-flex rounded-full border border-[#C6FF32]/25 bg-[#C6FF32]/10 px-3 py-1.5 text-sm font-black text-[#C6FF32]">
+            Published for {context.dateKey}
+          </div>
+        )}
+      </section>
+
       <section className="rounded-[24px] border border-white/10 bg-white/[0.025] p-5 sm:p-6">
         <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-[#C6FF32]">
-          <Sparkles className="h-4 w-4" /> Source review
+          <ShieldCheck className="h-4 w-4" /> Source review
         </div>
         <p className="mt-2 text-sm leading-6 text-white/55">
-          Changing an item to or from public-safe invalidates any older public approval until the public draft is regenerated.
+          Private synthesis can use the complete factual day. Public generation can use only Public safe items. Changing privacy invalidates an older public draft until it is regenerated.
         </p>
 
         <div className="mt-5 space-y-5">
@@ -292,9 +544,8 @@ function JournalDraftCard({
   journal,
   busy,
   stale = false,
-  disabled = false,
-  actionLabel,
-  onAction,
+  emptyActionLabel,
+  onEmptyAction,
   secondaryLabel,
   onSecondary,
 }: {
@@ -303,9 +554,8 @@ function JournalDraftCard({
   journal: DailyJournalDraft | null;
   busy: string;
   stale?: boolean;
-  disabled?: boolean;
-  actionLabel: string;
-  onAction: () => void;
+  emptyActionLabel: string;
+  onEmptyAction: () => void;
   secondaryLabel: string;
   onSecondary: () => void;
 }) {
@@ -323,7 +573,7 @@ function JournalDraftCard({
           </p>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full border border-white/10 px-2.5 py-1 text-white/50">
-              {approved ? "approved" : "pending approval"}
+              {journal.isPublished ? "published" : approved ? "approved" : "waiting for your approval"}
             </span>
             {stale ? (
               <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-2.5 py-1 text-amber-300">
@@ -336,26 +586,18 @@ function JournalDraftCard({
               href={`/admin/journal/${journal._id}`}
               className="inline-flex min-h-10 items-center rounded-xl border border-white/10 px-3 text-sm font-bold text-white/70"
             >
-              Read draft
+              Read full draft
             </Link>
-            {!approved ? (
+            {!journal.isPublished ? (
               <button
                 type="button"
-                onClick={onAction}
-                disabled={Boolean(busy) || disabled}
-                className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#C6FF32] px-3 text-sm font-black text-[#030608] disabled:opacity-50"
+                onClick={onSecondary}
+                disabled={Boolean(busy)}
+                className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-bold text-white/70 disabled:opacity-50"
               >
-                <Check className="h-4 w-4" /> {actionLabel}
+                <RefreshCw className="h-4 w-4" /> {secondaryLabel}
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={onSecondary}
-              disabled={Boolean(busy)}
-              className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-3 text-sm font-bold text-white/70 disabled:opacity-50"
-            >
-              <RefreshCw className="h-4 w-4" /> {secondaryLabel}
-            </button>
           </div>
         </>
       ) : (
@@ -363,11 +605,11 @@ function JournalDraftCard({
           <p className="text-sm leading-6 text-white/50">No draft exists for this day yet.</p>
           <button
             type="button"
-            onClick={onAction}
-            disabled={Boolean(busy) || disabled}
+            onClick={onEmptyAction}
+            disabled={Boolean(busy)}
             className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#C6FF32] px-3 text-sm font-black text-[#030608] disabled:opacity-50"
           >
-            <Sparkles className="h-4 w-4" /> {actionLabel}
+            <Sparkles className="h-4 w-4" /> {emptyActionLabel}
           </button>
         </div>
       )}
