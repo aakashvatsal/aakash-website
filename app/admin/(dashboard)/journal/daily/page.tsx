@@ -1,23 +1,8 @@
-import type { ComponentProps } from "react";
-
 import { DailyJournalWorkspace } from "@/components/admin/journal/DailyJournalWorkspace";
 import {
   getDailyContextWorkspaceServer,
   getJournalIntelligenceServer,
 } from "@/lib/api/daily-context.server";
-
-type DailyJournalWorkspaceProps = ComponentProps<
-  typeof DailyJournalWorkspace
->;
-
-type DailyWorkspace =
-  DailyJournalWorkspaceProps["initialWorkspace"];
-
-type WeeklyIntelligence =
-  DailyJournalWorkspaceProps["initialWeekly"];
-
-type MonthlyIntelligence =
-  DailyJournalWorkspaceProps["initialMonthly"];
 
 type DailyJournalPageProps = {
   searchParams?: Promise<{
@@ -127,16 +112,16 @@ export default async function DailyJournalPage({
 
   const [workspace, weekly, monthly] =
     await Promise.all([
-      getDailyContextWorkspaceServer<DailyWorkspace>(
+      getDailyContextWorkspaceServer(
         dateKey,
       ),
 
-      getJournalIntelligenceServer<WeeklyIntelligence>(
+      getJournalIntelligenceServer(
         "week",
         dateKey,
       ),
 
-      getJournalIntelligenceServer<MonthlyIntelligence>(
+      getJournalIntelligenceServer(
         "month",
         dateKey,
       ),
