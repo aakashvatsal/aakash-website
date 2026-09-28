@@ -17,17 +17,35 @@ export function PublicFooter() {
           </div>
 
           <div className="flex flex-wrap gap-4 md:justify-end">
-            <Link href="/companies" className="text-sm text-white/45 hover:text-white">
+            <Link
+              href="/companies"
+              className="text-sm text-white/45 hover:text-white"
+            >
               Companies
             </Link>
-            <Link href="/journal" className="text-sm text-white/45 hover:text-white">
+            <Link
+              href="/journal"
+              className="text-sm text-white/45 hover:text-white"
+            >
               Journal
             </Link>
-            <Link href="/library" className="text-sm text-white/45 hover:text-white">
+            <Link
+              href="/library"
+              className="text-sm text-white/45 hover:text-white"
+            >
               Library
             </Link>
-            <Link href="/now" className="text-sm text-white/45 hover:text-white">
+            <Link
+              href="/now"
+              className="text-sm text-white/45 hover:text-white"
+            >
               Now
+            </Link>
+            <Link
+              href="/aid"
+              className="text-sm text-white/45 hover:text-white"
+            >
+              Aid
             </Link>
             <Link href="/hsakaa" className="text-sm text-[#C6FF32]">
               HSAKAA
@@ -37,7 +55,9 @@ export function PublicFooter() {
 
         <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-6 text-xs text-white/35 md:flex-row md:items-center md:justify-between">
           <p>Made with ☕ in Mumbai.</p>
-          <p>System Status: <span className="text-[#C6FF32]">Online ●</span></p>
+          <p>
+            System Status: <span className="text-[#C6FF32]">Online ●</span>
+          </p>
         </div>
       </div>
     </footer>

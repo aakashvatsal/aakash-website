@@ -45,6 +45,7 @@ const pillarLabels: Record<MediaPublicIdentityPillar, string> = {
   learning_experiments: "Learning / experiments",
   building_aakash: "Building Aakash",
   human_unfiltered: "Human / unfiltered",
+  hsakaa_aid: "HSAKAA Aid",
 };
 
 function safeArray<T>(value: T[] | null | undefined): T[] {

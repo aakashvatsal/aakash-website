@@ -242,6 +242,16 @@ async function proxyRequest(
     );
   }
 
+  for (const headerName of [
+    "content-disposition",
+    "cache-control",
+  ]) {
+    const value = response.headers.get(headerName);
+    if (value) {
+      responseHeaders.set(headerName, value);
+    }
+  }
+
   return new NextResponse(
     response.body,
     {

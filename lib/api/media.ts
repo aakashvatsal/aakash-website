@@ -813,12 +813,67 @@ export async function recalibrateMediaFromBuffer() {
   }>("buffer/recalibrate", {});
 }
 
+export async function createManualMediaEntry(
+  payload: import("@/types/media").CreateManualMediaEntryPayload,
+) {
+  return createMediaCoreResource<import("@/types/media").MediaManualEntryResponse>(
+    "manual-entry",
+    payload,
+  );
+}
+
+export async function recordManualMediaPublicationMetrics(
+  publicationId: string,
+  payload: import("@/types/media").MediaManualPublicationMetrics,
+) {
+  return createMediaCoreResource<{
+    snapshot: Record<string, unknown>;
+    performance: { analyzed?: number };
+    growthLearnings: { generatedLearnings?: number };
+  }>(
+    `growth/publications/${encodeURIComponent(publicationId)}/snapshots`,
+    payload,
+  );
+}
+
+export async function recordManualMediaAccountMetrics(
+  accountId: string,
+  payload: {
+    capturedAt?: string;
+    followers?: number;
+    subscribers?: number;
+    profileViews?: number;
+    impressions?: number;
+    reach?: number;
+    views?: number;
+    websiteClicks?: number;
+    leads?: number;
+    source?: string;
+  },
+) {
+  return createMediaCoreResource<Record<string, unknown>>(
+    `growth/accounts/${encodeURIComponent(accountId)}/snapshots`,
+    { ...payload, source: payload.source ?? "manual" },
+  );
+}
+
 export async function getMediaGrowthOverview(days = 30) {
   const response = await fetch(
     `${API_URL}/media/core/growth/overview?days=${encodeURIComponent(String(days))}`,
     { cache: "no-store", headers: getAdminBackendHeaders() },
   );
   return parseResponse<import("@/types/media").MediaGrowthOverview>(response);
+}
+
+export async function getMediaManualAnalyticsQueue(limit = 160) {
+  const normalized = Math.min(300, Math.max(20, Math.trunc(limit)));
+  const response = await fetch(
+    `${API_URL}/media/core/growth/manual-analytics-queue?limit=${encodeURIComponent(String(normalized))}`,
+    { cache: "no-store", headers: getAdminBackendHeaders() },
+  );
+  return parseResponse<import("@/types/media").MediaManualAnalyticsQueue>(
+    response,
+  );
 }
 
 export async function syncMediaGrowthMetrics(limit = 50) {
@@ -1433,6 +1488,26 @@ export async function runMediaSocialPresenceReview(force = true) {
   return createMediaCoreResource<
     import("@/types/media").MediaSocialPresenceReview
   >("social-presence/review/run", { force });
+}
+
+export async function updateMediaSocialPinnedPublications(
+  platform: import("@/types/media").MediaPlatform,
+  publicationIds: string[],
+) {
+  const response = await fetch(
+    `${ADMIN_API_URL}/media/core/social-presence/profile/pins`,
+    {
+      method: "PATCH",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ platform, publicationIds }),
+    },
+  );
+  return parseResponse<import("@/types/media").MediaSocialProfile>(response);
 }
 
 export async function getMediaSocialPresenceOverviewClient() {

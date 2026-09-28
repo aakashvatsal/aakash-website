@@ -12,6 +12,10 @@ import {
   LoaderCircle,
   Square,
   Volume2,
+  Paperclip,
+  FileText,
+  HandCoins,
+  X,
 } from "lucide-react";
 import { motion } from "motion/react";
 import {
@@ -32,9 +36,11 @@ import {
   getHsakaaPersonSession,
   getHsakaaSpeechAudio,
   getVerifiedPersonHsakaaSpeechAudio,
+  uploadHsakaaFundEvidence,
 } from "@/services/hsakaa.service";
 
 import type {
+  HsakaaFundState,
   HsakaaMode,
   HsakaaVerifiedPerson,
 } from "@/services/hsakaa.service";
@@ -48,6 +54,7 @@ type ChatMessage = {
   role: "user" | "assistant";
   content: string;
   messageId?: string;
+  fund?: boolean;
 };
 
 interface HsakaaPageProps {
@@ -62,11 +69,9 @@ interface HsakaaPageProps {
  * Mobile additionally reserves 76px
  * for PublicMobileNav.
  */
-const TAKEOVER_TARGET =
-  "2026-08-31T14:00:00+05:30";
+const TAKEOVER_TARGET = "2026-08-31T14:00:00+05:30";
 
-const INITIAL_MESSAGE =
-  "Hey 👋 What do you want to know about me?";
+const INITIAL_MESSAGE = "Hey 👋 What do you want to know about me?";
 
 function getInitialMessage(person?: HsakaaVerifiedPerson | null) {
   if (!person) {
@@ -76,14 +81,13 @@ function getInitialMessage(person?: HsakaaVerifiedPerson | null) {
   return `Hey ${person.name} 👋 Hmmm, now I know who I’m talking to. What’s up?`;
 }
 
-const CONVERSATION_STORAGE_KEY =
-  "hsakaa_public_conversation_id";
+const CONVERSATION_STORAGE_KEY = "hsakaa_public_conversation_id";
 
-const CHAT_STORAGE_KEY =
-  "hsakaa_public_chat";
+const CHAT_STORAGE_KEY = "hsakaa_public_chat";
 
-const MODE_STORAGE_KEY =
-  "hsakaa_public_mode";
+const MODE_STORAGE_KEY = "hsakaa_public_mode";
+
+const FUND_STORAGE_KEY = "hsakaa_public_fund_case";
 
 const modes: {
   title: Mode;
@@ -146,7 +150,6 @@ const suggestionsByMode: Record<Mode, string[]> = {
     "How do you apply what you read to business?",
   ],
 
-
   Memory: [
     "What memories have you chosen to share publicly?",
     "What principles have you shared publicly?",
@@ -156,8 +159,7 @@ const suggestionsByMode: Record<Mode, string[]> = {
 };
 
 const modeIntro: Record<Mode, string> = {
-  Chat:
-    "Ask me about me: how I think, build, learn, read, decide or operate. I don’t answer unrelated general questions.",
+  Chat: "Ask me about me: how I think, build, learn, read, decide or operate. I don’t answer unrelated general questions.",
 
   Companies:
     "Focused on my ventures, product decisions, GTM, partnerships and founder strategy.",
@@ -168,14 +170,11 @@ const modeIntro: Record<Mode, string> = {
   Library:
     "Focused only on books I’m reading or have completed, using the public notes/highlights I’ve chosen to share as references.",
 
-
   Memory:
     "Focused on memories and principles I’ve explicitly chosen to make public. Private and person-specific memories stay protected.",
 };
 
-function getRelativeTime(
-  value?: string | Date | null,
-) {
+function getRelativeTime(value?: string | Date | null) {
   if (!value) {
     return null;
   }
@@ -188,38 +187,26 @@ function getRelativeTime(
 
   const differenceInSeconds = Math.max(
     0,
-    Math.floor(
-      (Date.now() - date.getTime()) /
-        1000,
-    ),
+    Math.floor((Date.now() - date.getTime()) / 1000),
   );
 
   if (differenceInSeconds < 60) {
     return "Updated just now";
   }
 
-  const differenceInMinutes =
-    Math.floor(
-      differenceInSeconds / 60,
-    );
+  const differenceInMinutes = Math.floor(differenceInSeconds / 60);
 
   if (differenceInMinutes < 60) {
     return `Updated ${differenceInMinutes}m ago`;
   }
 
-  const differenceInHours =
-    Math.floor(
-      differenceInMinutes / 60,
-    );
+  const differenceInHours = Math.floor(differenceInMinutes / 60);
 
   if (differenceInHours < 24) {
     return `Updated ${differenceInHours}h ago`;
   }
 
-  const differenceInDays =
-    Math.floor(
-      differenceInHours / 24,
-    );
+  const differenceInDays = Math.floor(differenceInHours / 24);
 
   if (differenceInDays === 1) {
     return "Updated yesterday";
@@ -229,114 +216,56 @@ function getRelativeTime(
     return `Updated ${differenceInDays}d ago`;
   }
 
-  return `Updated ${date.toLocaleDateString(
-    "en-IN",
-    {
-      day: "2-digit",
-      month: "short",
-    },
-  )}`;
+  return `Updated ${date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+  })}`;
 }
 
 function TakeoverCountdown() {
-  const targetDate = useMemo(
-    () =>
-      new Date(
-        TAKEOVER_TARGET,
-      ),
-    [],
-  );
+  const targetDate = useMemo(() => new Date(TAKEOVER_TARGET), []);
 
-  const [
-    remaining,
-    setRemaining,
-  ] = useState<number | null>(
-    null,
-  );
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     function updateCountdown() {
-      setRemaining(
-        Math.max(
-          0,
-          targetDate.getTime() -
-            Date.now(),
-        ),
-      );
+      setRemaining(Math.max(0, targetDate.getTime() - Date.now()));
     }
 
     updateCountdown();
 
-    const interval =
-      window.setInterval(
-        updateCountdown,
-        1000,
-      );
+    const interval = window.setInterval(updateCountdown, 1000);
 
     return () => {
-      window.clearInterval(
-        interval,
-      );
+      window.clearInterval(interval);
     };
   }, [targetDate]);
 
-  const totalSeconds =
-    remaining === null
-      ? null
-      : Math.floor(
-          remaining / 1000,
-        );
+  const totalSeconds = remaining === null ? null : Math.floor(remaining / 1000);
 
-  const days =
-    totalSeconds === null
-      ? null
-      : Math.floor(
-          totalSeconds / 86400,
-        );
+  const days = totalSeconds === null ? null : Math.floor(totalSeconds / 86400);
 
   const hours =
-    totalSeconds === null
-      ? null
-      : Math.floor(
-          (totalSeconds % 86400) /
-            3600,
-        );
+    totalSeconds === null ? null : Math.floor((totalSeconds % 86400) / 3600);
 
   const minutes =
-    totalSeconds === null
-      ? null
-      : Math.floor(
-          (totalSeconds % 3600) /
-            60,
-        );
+    totalSeconds === null ? null : Math.floor((totalSeconds % 3600) / 60);
 
-  const seconds =
-    totalSeconds === null
-      ? null
-      : totalSeconds % 60;
+  const seconds = totalSeconds === null ? null : totalSeconds % 60;
 
-  function pad(
-    value: number | null,
-  ) {
+  function pad(value: number | null) {
     if (value === null) {
       return "--";
     }
 
-    return String(value).padStart(
-      2,
-      "0",
-    );
+    return String(value).padStart(2, "0");
   }
 
-  const formattedTargetDate =
-    targetDate.toLocaleDateString(
-      "en-IN",
-      {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      },
-    );
+  const formattedTargetDate = targetDate.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
   return (
     <div className="rounded-2xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-4">
@@ -353,20 +282,16 @@ function TakeoverCountdown() {
       </div>
 
       <p className="mt-4 text-[11px] leading-[1.85] text-white/42">
-        I reply from what I&apos;ve chosen
-        to share here: my work,
-        journal, reading, memories
-        and the way I think.
+        I reply from what I&apos;ve chosen to share here: my work, journal,
+        reading, memories and the way I think.
       </p>
 
       <p className="mt-3 text-[11px] font-medium leading-[1.85] text-white/65">
         Ask me something personal.
         <span className="text-[#C6FF32]/85">
           {" "}
-          If I haven&apos;t shared enough
-          public context to answer it,
-          I&apos;ll tell you instead of
-          making something up.
+          If I haven&apos;t shared enough public context to answer it, I&apos;ll
+          tell you instead of making something up.
         </span>
       </p>
 
@@ -397,9 +322,7 @@ function TakeoverCountdown() {
       </p>
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-white/[0.05] pt-3">
-        <span className="text-[9px] text-white/20">
-          Target completion
-        </span>
+        <span className="text-[9px] text-white/20">Target completion</span>
 
         <span className="shrink-0 text-[9px] font-semibold text-white/40">
           {formattedTargetDate}
@@ -409,101 +332,73 @@ function TakeoverCountdown() {
   );
 }
 
-export function HsakaaPage({
-  now,
-  liveContext,
-}: HsakaaPageProps) {
-  const [
-    activeMode,
-    setActiveMode,
-  ] = useState<Mode>("Chat");
+export function HsakaaPage({ now, liveContext }: HsakaaPageProps) {
+  const [activeMode, setActiveMode] = useState<Mode>("Chat");
 
-  const [
-    message,
-    setMessage,
-  ] = useState("");
+  const [message, setMessage] = useState("");
 
-  const [
-    isLoading,
-    setIsLoading,
-  ] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [
-    speechMessageId,
-    setSpeechMessageId,
-  ] = useState<string | null>(null);
+  const [speechMessageId, setSpeechMessageId] = useState<string | null>(null);
 
-  const [
-    speechLoadingMessageId,
-    setSpeechLoadingMessageId,
-  ] = useState<string | null>(null);
+  const [speechLoadingMessageId, setSpeechLoadingMessageId] = useState<
+    string | null
+  >(null);
 
-  const [
-    speechError,
-    setSpeechError,
-  ] = useState<string | null>(null);
+  const [speechError, setSpeechError] = useState<string | null>(null);
 
-  const [
-    verifiedPerson,
-    setVerifiedPerson,
-  ] = useState<HsakaaVerifiedPerson | null>(null);
+  const [verifiedPerson, setVerifiedPerson] =
+    useState<HsakaaVerifiedPerson | null>(null);
 
-  const [
-    relativeTimeTick,
-    setRelativeTimeTick,
-  ] = useState(0);
+  const [relativeTimeTick, setRelativeTimeTick] = useState(0);
 
-  const [
-    chat,
-    setChat,
-  ] = useState<ChatMessage[]>([
+  const [chat, setChat] = useState<ChatMessage[]>([
     {
       role: "assistant",
-      content: INITIAL_MESSAGE,
+      content: getInitialMessage(null),
     },
   ]);
 
-  const [
-    conversationId,
-    setConversationId,
-  ] = useState<
-    string | undefined
-  >(undefined);
+  const [fundState, setFundState] = useState<HsakaaFundState | null>(null);
 
-  const [
-    hasRestoredSession,
-    setHasRestoredSession,
-  ] = useState(false);
+  const [selectedFundFiles, setSelectedFundFiles] = useState<File[]>([]);
 
-  const textareaRef =
-    useRef<HTMLTextAreaElement | null>(
-      null,
-    );
+  const [fundUploading, setFundUploading] = useState(false);
 
-  const messagesEndRef =
-    useRef<HTMLDivElement | null>(
-      null,
-    );
+  const [fundError, setFundError] = useState<string | null>(null);
 
-  const initialQuestionHandledRef =
-    useRef(false);
+  const [conversationId, setConversationId] = useState<string | undefined>(
+    undefined,
+  );
 
-  const audioRef =
-    useRef<HTMLAudioElement | null>(null);
+  const [hasRestoredSession, setHasRestoredSession] = useState(false);
 
-  const speechUrlRef =
-    useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const suggestions =
-    suggestionsByMode[activeMode];
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const hasStartedConversation =
-    useMemo(() => {
-      return chat.some(
-        (item) =>
-          item.role === "user",
-      );
-    }, [chat]);
+  const initialQuestionHandledRef = useRef(false);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const speechUrlRef = useRef<string | null>(null);
+
+  const fundFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const fundMode = fundState?.active === true;
+
+  const suggestions = fundMode
+    ? [
+        "I need help with an urgent medical expense.",
+        "I need financial assistance and want to explain my situation.",
+        "I need help paying an urgent bill.",
+        "How does HSAKAA Aid work?",
+      ]
+    : suggestionsByMode[activeMode];
+
+  const hasStartedConversation = useMemo(() => {
+    return chat.some((item) => item.role === "user");
+  }, [chat]);
 
   useEffect(() => {
     let cancelled = false;
@@ -571,6 +466,20 @@ export function HsakaaPage({
             setChat(parsed);
           }
         }
+
+        const storedFund = window.sessionStorage.getItem(FUND_STORAGE_KEY);
+
+        if (storedFund) {
+          const parsedFund = JSON.parse(storedFund) as HsakaaFundState;
+          if (
+            parsedFund &&
+            typeof parsedFund === "object" &&
+            parsedFund.active === true &&
+            typeof parsedFund.caseId === "string"
+          ) {
+            setFundState(parsedFund);
+          }
+        }
       } catch {
         // Ignore malformed browser storage.
       } finally {
@@ -596,94 +505,68 @@ export function HsakaaPage({
       return;
     }
 
-    window.sessionStorage.setItem(
-      MODE_STORAGE_KEY,
-      activeMode,
-    );
+    window.sessionStorage.setItem(MODE_STORAGE_KEY, activeMode);
 
-    window.sessionStorage.setItem(
-      CHAT_STORAGE_KEY,
-      JSON.stringify(chat),
-    );
+    window.sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chat));
 
     if (conversationId) {
+      window.sessionStorage.setItem(CONVERSATION_STORAGE_KEY, conversationId);
+    } else {
+      window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
+    }
+
+    if (fundState?.active && fundState.caseId) {
       window.sessionStorage.setItem(
-        CONVERSATION_STORAGE_KEY,
-        conversationId,
+        FUND_STORAGE_KEY,
+        JSON.stringify(fundState),
       );
     } else {
-      window.sessionStorage.removeItem(
-        CONVERSATION_STORAGE_KEY,
-      );
+      window.sessionStorage.removeItem(FUND_STORAGE_KEY);
     }
   }, [
     activeMode,
     chat,
     conversationId,
+    fundState,
     hasRestoredSession,
     verifiedPerson,
   ]);
 
   useEffect(() => {
-    const interval =
-      window.setInterval(
-        () => {
-          setRelativeTimeTick(
-            (current) =>
-              current + 1,
-          );
-        },
-        60_000,
-      );
+    const interval = window.setInterval(() => {
+      setRelativeTimeTick((current) => current + 1);
+    }, 60_000);
 
     return () => {
-      window.clearInterval(
-        interval,
-      );
+      window.clearInterval(interval);
     };
   }, []);
 
-  const relativeNowTime =
-    useMemo(() => {
-      void relativeTimeTick;
+  const relativeNowTime = useMemo(() => {
+    void relativeTimeTick;
 
-      return getRelativeTime(
-        now?.updatedAt,
-      );
-    }, [
-      now?.updatedAt,
-      relativeTimeTick,
-    ]);
+    return getRelativeTime(now?.updatedAt);
+  }, [now?.updatedAt, relativeTimeTick]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView(
-      {
-        behavior: "smooth",
-        block: "end",
-      },
-    );
-  }, [
-    chat,
-    isLoading,
-  ]);
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [chat, isLoading]);
 
   useEffect(() => {
-    const textarea =
-      textareaRef.current;
+    const textarea = textareaRef.current;
 
     if (!textarea) {
       return;
     }
 
-    textarea.style.height =
-      "0px";
+    textarea.style.height = "0px";
 
     const maxHeight = 160;
 
-    textarea.style.height = `${Math.min(
-      textarea.scrollHeight,
-      maxHeight,
-    )}px`;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
   }, [message]);
 
   const stopSpeech = useCallback(() => {
@@ -751,12 +634,7 @@ export function HsakaaPage({
         stopSpeech();
       }
     },
-    [
-      conversationId,
-      speechMessageId,
-      stopSpeech,
-      verifiedPerson,
-    ],
+    [conversationId, speechMessageId, stopSpeech, verifiedPerson],
   );
 
   useEffect(() => {
@@ -772,14 +650,9 @@ export function HsakaaPage({
 
   const sendMessage = useCallback(
     async (text?: string) => {
-      const finalMessage = (
-        text ?? message
-      ).trim();
+      const finalMessage = (text ?? message).trim();
 
-      if (
-        !finalMessage ||
-        isLoading
-      ) {
+      if (!finalMessage || isLoading || fundUploading) {
         return;
       }
 
@@ -808,9 +681,11 @@ export function HsakaaPage({
               conversationId,
             });
 
-        setConversationId(
-          response.conversationId,
-        );
+        setConversationId(response.conversationId);
+
+        if (response.fund) {
+          setFundState(response.fund);
+        }
 
         setChat((current) => [
           ...current,
@@ -818,6 +693,7 @@ export function HsakaaPage({
             role: "assistant",
             content: response.answer,
             messageId: response.messageId,
+            fund: response.scope === "fund",
           },
         ]);
       } catch (error) {
@@ -842,31 +718,66 @@ export function HsakaaPage({
     [
       activeMode,
       conversationId,
+      fundUploading,
       isLoading,
       message,
       verifiedPerson,
     ],
   );
 
-  useEffect(() => {
+  const uploadFundEvidence = useCallback(async () => {
     if (
-      !hasRestoredSession ||
-      initialQuestionHandledRef.current
+      !fundState?.active ||
+      !fundState.caseId ||
+      !selectedFundFiles.length ||
+      fundUploading ||
+      isLoading
     ) {
       return;
     }
 
-    initialQuestionHandledRef.current =
-      true;
+    setFundUploading(true);
+    setFundError(null);
 
-    const url = new URL(
-      window.location.href,
-    );
+    try {
+      const result = await uploadHsakaaFundEvidence({
+        caseId: fundState.caseId,
+        files: selectedFundFiles,
+      });
 
-    const question =
-      url.searchParams
-        .get("q")
-        ?.trim();
+      setChat((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content: result.message,
+          fund: true,
+        },
+      ]);
+      setSelectedFundFiles([]);
+      if (fundFileInputRef.current) {
+        fundFileInputRef.current.value = "";
+      }
+    } catch (error) {
+      setFundError(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload Aid evidence.",
+      );
+    } finally {
+      setFundUploading(false);
+    }
+  }, [fundState, fundUploading, isLoading, selectedFundFiles]);
+
+  useEffect(() => {
+    if (!hasRestoredSession || initialQuestionHandledRef.current) {
+      return;
+    }
+
+    initialQuestionHandledRef.current = true;
+
+    const url = new URL(window.location.href);
+
+    const question = url.searchParams.get("q")?.trim();
 
     if (!question) {
       return;
@@ -881,14 +792,9 @@ export function HsakaaPage({
     );
 
     void sendMessage(question);
-  }, [
-    hasRestoredSession,
-    sendMessage,
-  ]);
+  }, [hasRestoredSession, sendMessage]);
 
-  function handleTextareaKeyDown(
-    event: KeyboardEvent<HTMLTextAreaElement>,
-  ) {
+  function handleTextareaKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (
       event.key === "Enter" &&
       !event.shiftKey &&
@@ -900,10 +806,8 @@ export function HsakaaPage({
     }
   }
 
-  function handleModeClick(
-    mode: Mode,
-  ) {
-    if (mode === activeMode) {
+  function handleModeClick(mode: Mode) {
+    if (fundMode || mode === activeMode) {
       return;
     }
 
@@ -920,6 +824,9 @@ export function HsakaaPage({
 
   function startNewChat() {
     setConversationId(undefined);
+    setFundState(null);
+    setSelectedFundFiles([]);
+    setFundError(null);
 
     setChat([
       {
@@ -929,6 +836,7 @@ export function HsakaaPage({
     ]);
 
     setMessage("");
+    window.sessionStorage.removeItem(FUND_STORAGE_KEY);
 
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -938,6 +846,9 @@ export function HsakaaPage({
   function handleVerified(person: HsakaaVerifiedPerson) {
     setVerifiedPerson(person);
     setConversationId(undefined);
+    setFundState(null);
+    setSelectedFundFiles([]);
+    setFundError(null);
     setChat([
       {
         role: "assistant",
@@ -946,14 +857,24 @@ export function HsakaaPage({
     ]);
     window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
     window.sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    window.sessionStorage.removeItem(FUND_STORAGE_KEY);
   }
 
   function handleVerifiedLogout() {
     setVerifiedPerson(null);
     setConversationId(undefined);
-    setChat([{ role: "assistant", content: INITIAL_MESSAGE }]);
+    setFundState(null);
+    setSelectedFundFiles([]);
+    setFundError(null);
+    setChat([
+      {
+        role: "assistant",
+        content: getInitialMessage(null),
+      },
+    ]);
     window.sessionStorage.removeItem(CONVERSATION_STORAGE_KEY);
     window.sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    window.sessionStorage.removeItem(FUND_STORAGE_KEY);
   }
 
   return (
@@ -977,9 +898,7 @@ export function HsakaaPage({
               </div>
 
               <div className="min-w-0">
-                <p className="text-[13px] font-black tracking-tight">
-                  Aakash
-                </p>
+                <p className="text-[13px] font-black tracking-tight">Aakash</p>
 
                 <p className="mt-0.5 text-[10px] text-white/35">
                   Personal chat
@@ -995,61 +914,68 @@ export function HsakaaPage({
               className="flex w-full items-center gap-2.5 rounded-xl border border-white/[0.08] px-3 py-2.5 text-left text-[12px] font-semibold text-white/65 transition hover:border-white/15 hover:bg-white/[0.04] hover:text-white"
             >
               <Plus className="h-3.5 w-3.5" />
-
               New chat
             </button>
           </div>
 
           <nav className="mt-5 min-h-0 flex-1 space-y-1 overflow-y-auto px-3">
-            {modes.map((mode) => {
-              const Icon = mode.icon;
+            {fundMode ? (
+              <div className="flex w-full items-center gap-3 rounded-xl bg-[#C6FF32]/10 px-3 py-2.5 text-left text-white">
+                <HandCoins className="h-3.5 w-3.5 shrink-0 text-[#C6FF32]" />
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold leading-4">HSAKAA Aid</p>
+                  <p className="mt-0.5 truncate text-[10px] leading-4 text-white/25">
+                    Human-reviewed assistance
+                  </p>
+                </div>
+              </div>
+            ) : (
+              modes.map((mode) => {
+                const Icon = mode.icon;
 
-              const isActive =
-                activeMode ===
-                mode.title;
+                const isActive = activeMode === mode.title;
 
-              return (
-                <button
-                  key={mode.title}
-                  type="button"
-                  onClick={() =>
-                    handleModeClick(
-                      mode.title,
-                    )
-                  }
-                  className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                    isActive
-                      ? "bg-[#C6FF32]/10 text-white"
-                      : "text-white/45 hover:bg-white/[0.04] hover:text-white/75"
-                  }`}
-                >
-                  <Icon
-                    className={`h-3.5 w-3.5 shrink-0 ${
+                return (
+                  <button
+                    key={mode.title}
+                    type="button"
+                    onClick={() => handleModeClick(mode.title)}
+                    className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                       isActive
-                        ? "text-[#C6FF32]"
-                        : "text-white/30 group-hover:text-white/50"
+                        ? "bg-[#C6FF32]/10 text-white"
+                        : "text-white/45 hover:bg-white/[0.04] hover:text-white/75"
                     }`}
-                  />
+                  >
+                    <Icon
+                      className={`h-3.5 w-3.5 shrink-0 ${
+                        isActive
+                          ? "text-[#C6FF32]"
+                          : "text-white/30 group-hover:text-white/50"
+                      }`}
+                    />
 
-                  <div className="min-w-0">
-                    <p className="text-[12px] font-bold leading-4">
-                      {mode.title}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-bold leading-4">
+                        {mode.title}
+                      </p>
 
-                    <p className="mt-0.5 truncate text-[10px] leading-4 text-white/25">
-                      {mode.description}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
+                      <p className="mt-0.5 truncate text-[10px] leading-4 text-white/25">
+                        {mode.description}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </nav>
 
           <div className="shrink-0 border-t border-white/[0.07] px-4 py-4">
             <p className="text-[10px] leading-4 text-white/20">
-              {verifiedPerson
-                ? `Verified as ${verifiedPerson.name}. Person-specific context is used only when I’ve explicitly shared it.`
-                : "Public context about me only. Health and Media stay private."}
+              {fundMode
+                ? "Aid case data stays outside normal HSAKAA Memory. Final decisions are human-approved."
+                : verifiedPerson
+                  ? `Verified as ${verifiedPerson.name}. Person-specific context is used only when I’ve explicitly shared it.`
+                  : "Public context about me only. Health and Media stay private."}
             </p>
           </div>
         </aside>
@@ -1064,18 +990,20 @@ export function HsakaaPage({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-[14px] font-black tracking-tight">
-                    Aakash
+                    {fundMode ? "HSAKAA Aid" : "Aakash"}
                   </h1>
 
                   <span className="h-1 w-1 rounded-full bg-[#C6FF32]" />
 
                   <span className="text-[11px] font-medium text-white/35">
-                    {activeMode}
+                    {fundMode ? "Aid" : activeMode}
                   </span>
                 </div>
 
                 <p className="mt-1 truncate text-[11px] text-white/30">
-                  {modeIntro[activeMode]}
+                  {fundMode
+                    ? "I will ask only for the next thing needed to verify the request."
+                    : modeIntro[activeMode]}
                 </p>
               </div>
 
@@ -1093,7 +1021,6 @@ export function HsakaaPage({
                   className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-white/40 transition hover:bg-white/[0.05] hover:text-white"
                 >
                   <Plus className="h-3.5 w-3.5" />
-
                   New
                 </button>
               </div>
@@ -1106,155 +1033,156 @@ export function HsakaaPage({
             <div className="mx-auto flex min-h-full max-w-[820px] flex-col px-4 py-6 md:px-6">
               {/* MOBILE / TABLET TAKEOVER PANEL */}
 
-              <div className="mb-7 xl:hidden">
-                <TakeoverCountdown />
-              </div>
+              {!fundMode ? (
+                <div className="mb-7 xl:hidden">
+                  <TakeoverCountdown />
+                </div>
+              ) : null}
 
               {!hasStartedConversation && (
                 <div className="mb-9">
                   <div className="max-w-xl">
-                    <Eyebrow>
-                      {activeMode}
-                    </Eyebrow>
+                    <Eyebrow>{fundMode ? "HSAKAA Aid" : activeMode}</Eyebrow>
 
                     <h2 className="mt-3 text-xl font-black tracking-[-0.035em] text-white md:text-2xl">
-                      Ask what you actually
-                      want to know.
+                      {fundMode
+                        ? "Start with what happened."
+                        : "Ask what you actually want to know."}
                     </h2>
 
                     <p className="mt-2 max-w-lg text-[12px] leading-5 text-white/35">
-                      {modeIntro[activeMode]}
+                      {fundMode
+                        ? "Answer only what HSAKAA asks next. Supporting files can be added when needed."
+                        : modeIntro[activeMode]}
                     </p>
                   </div>
 
                   <div className="mt-6 grid gap-2 sm:grid-cols-2">
-                    {suggestions.map(
-                      (question) => (
-                        <motion.button
-                          key={question}
-                          type="button"
-                          onClick={() =>
-                            sendMessage(
-                              question,
-                            )
-                          }
-                          disabled={
-                            isLoading
-                          }
-                          whileHover={{
-                            y: -1,
-                          }}
-                          whileTap={{
-                            scale:
-                              0.99,
-                          }}
-                          className="rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-left text-[11px] leading-5 text-white/45 transition hover:border-[#C6FF32]/25 hover:bg-white/[0.04] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {question}
-                        </motion.button>
-                      ),
-                    )}
+                    {suggestions.map((question) => (
+                      <motion.button
+                        key={question}
+                        type="button"
+                        onClick={() => sendMessage(question)}
+                        disabled={isLoading}
+                        whileHover={{
+                          y: -1,
+                        }}
+                        whileTap={{
+                          scale: 0.99,
+                        }}
+                        className="rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-left text-[11px] leading-5 text-white/45 transition hover:border-[#C6FF32]/25 hover:bg-white/[0.04] hover:text-white/75 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {question}
+                      </motion.button>
+                    ))}
                   </div>
                 </div>
               )}
 
               <div className="space-y-7">
-                {chat.map(
-                  (
-                    item,
-                    index,
-                  ) => {
-                    const isUser =
-                      item.role ===
-                      "user";
+                {chat.map((item, index) => {
+                  const isUser = item.role === "user";
 
-                    if (isUser) {
-                      return (
-                        <div
-                          key={`${item.role}-${index}`}
-                          className="flex justify-end"
-                        >
-                          <div className="max-w-[78%] rounded-2xl rounded-br-md bg-[#C6FF32] px-4 py-2.5 text-[#030608] sm:max-w-[70%]">
-                            <p className="whitespace-pre-wrap text-[13px] font-medium leading-[1.65]">
-                              {item.content}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
-
+                  if (isUser) {
                     return (
                       <div
                         key={`${item.role}-${index}`}
-                        className="flex items-start gap-3"
+                        className="flex justify-end"
                       >
-                        <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#C6FF32] text-[#030608]">
-                          <UserRound className="h-3.5 w-3.5" />
-                        </div>
-
-                        <div className="min-w-0 max-w-[720px] flex-1">
-                          <div className="mb-1.5 flex items-center gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/28">
-                              Aakash
-                            </span>
-
-                            {item.messageId && conversationId ? (
-                              <button
-                                type="button"
-                                onClick={() => void toggleSpeech(item.messageId!)}
-                                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white/30 transition hover:bg-white/[0.05] hover:text-white/65"
-                                aria-label={speechMessageId === item.messageId ? "Stop voice" : "Listen to Aakash"}
-                                title={speechMessageId === item.messageId ? "Stop" : "Listen"}
-                              >
-                                {speechLoadingMessageId === item.messageId ? (
-                                  <LoaderCircle className="h-3 w-3 animate-spin" />
-                                ) : speechMessageId === item.messageId ? (
-                                  <Square className="h-2.5 w-2.5 fill-current" />
-                                ) : (
-                                  <Volume2 className="h-3 w-3" />
-                                )}
-                                <span>{speechMessageId === item.messageId ? "Stop" : "Listen"}</span>
-                              </button>
-                            ) : null}
-                          </div>
-
-                          <ChatRichText content={item.content} />
+                        <div className="max-w-[78%] rounded-2xl rounded-br-md bg-[#C6FF32] px-4 py-2.5 text-[#030608] sm:max-w-[70%]">
+                          <p className="whitespace-pre-wrap text-[13px] font-medium leading-[1.65]">
+                            {item.content}
+                          </p>
                         </div>
                       </div>
                     );
-                  },
-                )}
+                  }
 
-                {isLoading && (
+                  return (
+                    <div
+                      key={`${item.role}-${index}`}
+                      className="flex items-start gap-3"
+                    >
+                      <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#C6FF32] text-[#030608]">
+                        {item.fund ? (
+                          <HandCoins className="h-3.5 w-3.5" />
+                        ) : (
+                          <UserRound className="h-3.5 w-3.5" />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 max-w-[720px] flex-1">
+                        <div className="mb-1.5 flex items-center gap-2">
+                          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/28">
+                            {item.fund ? "HSAKAA Aid" : "Aakash"}
+                          </span>
+
+                          {item.messageId && conversationId ? (
+                            <button
+                              type="button"
+                              onClick={() => void toggleSpeech(item.messageId!)}
+                              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.08em] text-white/30 transition hover:bg-white/[0.05] hover:text-white/65"
+                              aria-label={
+                                speechMessageId === item.messageId
+                                  ? "Stop voice"
+                                  : "Listen to Aakash"
+                              }
+                              title={
+                                speechMessageId === item.messageId
+                                  ? "Stop"
+                                  : "Listen"
+                              }
+                            >
+                              {speechLoadingMessageId === item.messageId ? (
+                                <LoaderCircle className="h-3 w-3 animate-spin" />
+                              ) : speechMessageId === item.messageId ? (
+                                <Square className="h-2.5 w-2.5 fill-current" />
+                              ) : (
+                                <Volume2 className="h-3 w-3" />
+                              )}
+                              <span>
+                                {speechMessageId === item.messageId
+                                  ? "Stop"
+                                  : "Listen"}
+                              </span>
+                            </button>
+                          ) : null}
+                        </div>
+
+                        <ChatRichText content={item.content} />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {(isLoading || fundUploading) && (
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#C6FF32] text-[#030608]">
-                      <UserRound className="h-3.5 w-3.5" />
+                      {fundUploading ? (
+                        <FileText className="h-3.5 w-3.5" />
+                      ) : fundMode ? (
+                        <HandCoins className="h-3.5 w-3.5" />
+                      ) : (
+                        <UserRound className="h-3.5 w-3.5" />
+                      )}
                     </div>
 
                     <div className="pt-1">
                       <div className="flex items-center gap-1.5">
-                        {[0, 0.2, 0.4].map(
-                          (delay) => (
-                            <motion.span
-                              key={delay}
-                              animate={{
-                                opacity: [
-                                  0.25,
-                                  1,
-                                  0.25,
-                                ],
-                              }}
-                              transition={{
-                                duration:
-                                  1.2,
-                                delay,
-                                repeat:
-                                  Infinity,
-                              }}
-                              className="h-1.5 w-1.5 rounded-full bg-white/50"
-                            />
-                          ),
-                        )}
+                        {[0, 0.2, 0.4].map((delay) => (
+                          <motion.span
+                            key={delay}
+                            animate={{
+                              opacity: [0.25, 1, 0.25],
+                            }}
+                            transition={{
+                              duration: 1.2,
+                              delay,
+                              repeat: Infinity,
+                            }}
+                            className="h-1.5 w-1.5 rounded-full bg-white/50"
+                          />
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -1266,9 +1194,7 @@ export function HsakaaPage({
                   </p>
                 ) : null}
 
-                <div
-                  ref={messagesEndRef}
-                />
+                <div ref={messagesEndRef} />
               </div>
             </div>
           </div>
@@ -1278,54 +1204,129 @@ export function HsakaaPage({
           <div className="shrink-0 border-t border-white/[0.06] bg-[#030608]/98 px-4 pb-3 pt-3 backdrop-blur-xl md:px-6 md:pb-5">
             <div className="mx-auto max-w-[820px]">
               <div className="rounded-2xl border border-white/[0.10] bg-[#0B0F10] p-2 shadow-[0_20px_60px_rgba(0,0,0,0.35)] transition focus-within:border-white/[0.18]">
+                {fundState?.active && fundState.caseId ? (
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.045] px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#C6FF32]/70">
+                        Fund case
+                      </p>
+                      <p className="mt-0.5 truncate font-mono text-[10px] font-semibold text-white/55">
+                        {fundState.caseReference || fundState.caseId}
+                      </p>
+                    </div>
+                    <p className="text-[9px] text-white/28">Human-reviewed</p>
+                  </div>
+                ) : null}
+
+                {selectedFundFiles.length ? (
+                  <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+                    {selectedFundFiles.map((file) => (
+                      <span
+                        key={`${file.name}-${file.size}`}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-[9px] text-white/45"
+                      >
+                        <FileText className="h-3 w-3 shrink-0 text-[#C6FF32]/65" />
+                        <span className="max-w-[180px] truncate">
+                          {file.name}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${file.name}`}
+                          onClick={() =>
+                            setSelectedFundFiles((current) =>
+                              current.filter((item) => item !== file),
+                            )
+                          }
+                          className="text-white/25 transition hover:text-white/65"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={() => void uploadFundEvidence()}
+                      disabled={fundUploading || isLoading}
+                      className="rounded-lg bg-[#C6FF32] px-2.5 py-1 text-[9px] font-black text-[#030608] disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {fundUploading ? "Uploading..." : "Upload evidence"}
+                    </button>
+                  </div>
+                ) : null}
+
                 <div className="flex items-end gap-2">
+                  {fundState?.active &&
+                  fundState.canUploadEvidence !== false ? (
+                    <>
+                      <input
+                        ref={fundFileInputRef}
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={(event) => {
+                          const files = Array.from(
+                            event.target.files || [],
+                          ).slice(0, 4);
+                          const invalid = files.find(
+                            (file) => file.size > 5 * 1024 * 1024,
+                          );
+                          if (invalid) {
+                            setFundError(
+                              "Each Fund evidence file must be 5 MB or smaller.",
+                            );
+                            event.target.value = "";
+                            return;
+                          }
+                          setFundError(null);
+                          setSelectedFundFiles(files);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        aria-label="Attach Fund evidence"
+                        title="Attach PDF or image evidence"
+                        onClick={() => fundFileInputRef.current?.click()}
+                        disabled={isLoading || fundUploading}
+                        className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/[0.08] text-white/35 transition hover:border-[#C6FF32]/25 hover:text-[#C6FF32] disabled:cursor-not-allowed disabled:opacity-35"
+                      >
+                        <Paperclip className="h-4 w-4" />
+                      </button>
+                    </>
+                  ) : null}
+
                   <textarea
                     ref={textareaRef}
                     value={message}
                     rows={1}
-                    disabled={
-                      isLoading
+                    disabled={isLoading || fundUploading}
+                    placeholder={
+                      fundMode
+                        ? "Tell HSAKAA what happened..."
+                        : `Ask Aakash about ${activeMode.toLowerCase()}...`
                     }
-                    placeholder={`Ask Aakash about ${activeMode.toLowerCase()}...`}
-                    onChange={(
-                      event,
-                    ) =>
-                      setMessage(
-                        event.target
-                          .value,
-                      )
-                    }
-                    onKeyDown={
-                      handleTextareaKeyDown
-                    }
+                    onChange={(event) => setMessage(event.target.value)}
+                    onKeyDown={handleTextareaKeyDown}
                     className="max-h-40 min-h-[42px] min-w-0 flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-[13px] leading-[1.6] text-white outline-none placeholder:text-white/22 disabled:cursor-not-allowed disabled:opacity-50"
                   />
 
                   <motion.button
                     type="button"
                     aria-label="Send message"
-                    onClick={() =>
-                      sendMessage()
-                    }
-                    disabled={
-                      !message.trim() ||
-                      isLoading
-                    }
+                    onClick={() => sendMessage()}
+                    disabled={!message.trim() || isLoading || fundUploading}
                     whileHover={
-                      message.trim() &&
-                      !isLoading
+                      message.trim() && !isLoading && !fundUploading
                         ? {
-                            scale:
-                              1.04,
+                            scale: 1.04,
                           }
                         : undefined
                     }
                     whileTap={
-                      message.trim() &&
-                      !isLoading
+                      message.trim() && !isLoading && !fundUploading
                         ? {
-                            scale:
-                              0.96,
+                            scale: 0.96,
                           }
                         : undefined
                     }
@@ -1337,9 +1338,14 @@ export function HsakaaPage({
               </div>
 
               <p className="mt-2 text-center text-[9px] text-white/18">
-                Enter to send · Shift +
-                Enter for a new line
+                Enter to send · Shift + Enter for a new line
               </p>
+
+              {fundError ? (
+                <p className="mt-2 text-center text-[10px] text-red-300/70">
+                  {fundError}
+                </p>
+              ) : null}
             </div>
           </div>
         </section>
@@ -1349,40 +1355,69 @@ export function HsakaaPage({
         <aside className="hidden h-full min-h-0 overflow-y-auto border-l border-white/[0.07] bg-[#030608] px-5 py-5 xl:block">
           {/* TAKEOVER STATUS */}
 
-          <TakeoverCountdown />
+          {fundMode ? (
+            <div className="rounded-2xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-4">
+              <div className="flex items-center gap-2">
+                <HandCoins className="h-4 w-4 text-[#C6FF32]" />
+                <Eyebrow>HSAKAA Aid</Eyebrow>
+              </div>
+              <p className="mt-4 text-[11px] leading-5 text-white/45">
+                Monthly allocation: ₹30,000. HSAKAA assesses and verifies the
+                request, but a human makes every final decision.
+              </p>
+              {fundState?.caseReference ? (
+                <div className="mt-4 border-t border-white/[0.06] pt-4">
+                  <p className="text-[9px] uppercase tracking-[0.16em] text-white/20">
+                    Case
+                  </p>
+                  <p className="mt-1 font-mono text-[11px] font-bold text-[#C6FF32]/80">
+                    {fundState.caseReference}
+                  </p>
+                  {fundState.reviewTargetAt ? (
+                    <p className="mt-2 text-[9px] leading-4 text-white/25">
+                      Review target:{" "}
+                      {new Date(fundState.reviewTargetAt).toLocaleString(
+                        "en-IN",
+                      )}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+              <p className="mt-4 border-t border-white/[0.06] pt-4 text-[9px] leading-4 text-white/25">
+                Aid contact, payment information, evidence and case transcript
+                stay outside normal HSAKAA Memory.
+              </p>
+            </div>
+          ) : (
+            <TakeoverCountdown />
+          )}
 
           {/* LIVE CONTEXT */}
 
-          <div className="mt-8">
-            <div className="flex items-start justify-between gap-3">
-              <Eyebrow>
-                Live Context
-              </Eyebrow>
+          {!fundMode ? (
+            <div className="mt-8">
+              <div className="flex items-start justify-between gap-3">
+                <Eyebrow>Live Context</Eyebrow>
 
-              {relativeNowTime && (
-                <span className="shrink-0 pt-0.5 text-[8px] font-medium text-white/20">
-                  {relativeNowTime}
-                </span>
-              )}
-            </div>
+                {relativeNowTime && (
+                  <span className="shrink-0 pt-0.5 text-[8px] font-medium text-white/20">
+                    {relativeNowTime}
+                  </span>
+                )}
+              </div>
 
-            <p className="mt-3 text-[10px] leading-5 text-white/28">
-              A live snapshot of what
-              is currently shaping
-              Aakash&apos;s attention.
-            </p>
+              <p className="mt-3 text-[10px] leading-5 text-white/28">
+                A live snapshot of what is currently shaping Aakash&apos;s
+                attention.
+              </p>
 
-            {liveContext.length >
-            0 ? (
-              <div className="mt-6 divide-y divide-white/[0.06] border-y border-white/[0.06]">
-                {liveContext.map(
-                  (item) => (
+              {liveContext.length > 0 ? (
+                <div className="mt-6 divide-y divide-white/[0.06] border-y border-white/[0.06]">
+                  {liveContext.map((item) => (
                     <button
                       key={`${item.label}-${item.value}`}
                       type="button"
-                      disabled={
-                        isLoading
-                      }
+                      disabled={isLoading}
                       onClick={() =>
                         sendMessage(
                           `Tell me about Aakash's current ${item.label.toLowerCase()}: ${item.value}`,
@@ -1398,19 +1433,17 @@ export function HsakaaPage({
                         {item.value}
                       </p>
                     </button>
-                  ),
-                )}
-              </div>
-            ) : (
-              <div className="mt-6 border-y border-white/[0.06] py-5">
-                <p className="text-[10px] leading-5 text-white/25">
-                  Aakash hasn&apos;t
-                  shared a live status
-                  right now.
-                </p>
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 border-y border-white/[0.06] py-5">
+                  <p className="text-[10px] leading-5 text-white/25">
+                    Aakash hasn&apos;t shared a live status right now.
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : null}
         </aside>
       </div>
     </main>

@@ -12,7 +12,7 @@ export default async function MediaSocialPresencePage() {
       <AdminPageHeader
         eyebrow="Media V4 · Social Presence & Network"
         title="Network & Profiles"
-        description="Sync live profiles, review whether bios/photos truly need changing, and manage the accounts HSAKAA recommends following. Audit weekly; change identity rarely."
+        description="HSAKAA manages the full profile surface: bio/about, profile photo, link, banner and analytics-aware pin/feature decisions. Audit weekly, change identity rarely, and record pin changes after you apply them on-platform."
         actions={
           <div className="flex flex-wrap gap-3">
             <Link

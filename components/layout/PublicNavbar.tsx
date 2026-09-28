@@ -9,6 +9,7 @@ import {
   Building2,
   Clock,
   HeartPulse,
+  HandHeart,
   Home,
   Menu,
   Newspaper,
@@ -26,6 +27,7 @@ const nav = [
   { title: "Journal", href: "/journal", icon: Newspaper },
   { title: "Library", href: "/library", icon: BookOpen },
   { title: "Health", href: "/health", icon: HeartPulse },
+  { title: "Aid", href: "/aid", icon: HandHeart },
   { title: "Media", href: "/media", icon: Radio },
   { title: "Now", href: "/now", icon: Clock },
 ];
@@ -93,9 +95,7 @@ export function PublicNavbar() {
     document.body.style.overflow = "";
   }
 
-  function handleMobileToggle(
-    event: React.SyntheticEvent<HTMLDetailsElement>
-  ) {
+  function handleMobileToggle(event: React.SyntheticEvent<HTMLDetailsElement>) {
     const isOpen = event.currentTarget.open;
 
     document.documentElement.style.overflow = isOpen ? "hidden" : "";
@@ -190,7 +190,7 @@ export function PublicNavbar() {
         <div className="fixed inset-0 z-[600] bg-[#030608] pt-24">
           <div className="h-[calc(100dvh-6rem)] px-3 pb-[max(12px,env(safe-area-inset-bottom))]">
             <div className="grid h-full grid-rows-[minmax(0,1fr)_auto] rounded-[28px] border border-white/10 bg-[#05090b] p-3">
-              <nav className="grid min-h-0 grid-rows-[repeat(7,minmax(0,1fr))] gap-2">
+              <nav className="grid min-h-0 grid-rows-[repeat(8,minmax(0,1fr))] gap-2">
                 {nav.map((item) => {
                   const Icon = item.icon;
                   const active = activeRoot === item.href;

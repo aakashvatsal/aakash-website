@@ -18,7 +18,9 @@ import {
 import {
   acceptMemoryInboxItem,
   captureMemoryInboxItem,
+  generatePublicMemoryCandidates,
   rejectMemoryInboxItem,
+  type PublicMemoryImportSource,
 } from "@/lib/api/memory";
 import {
   MEMORY_TYPE_OPTIONS,
@@ -95,6 +97,9 @@ export function MemoryInbox({
   const [individualPersonId, setIndividualPersonId] = useState(initialPersonId);
   const [groupPersonIds, setGroupPersonIds] = useState<string[]>([]);
   const [type, setType] = useState<MemoryType>(MemoryType.FACT);
+  const [accessLevel, setAccessLevel] = useState<MemoryAccessLevel>(
+    MemoryAccessLevel.OWNER_ONLY,
+  );
   const [durability, setDurability] = useState<MemoryDurability>(
     MemoryDurability.DURABLE,
   );
@@ -109,6 +114,15 @@ export function MemoryInbox({
   const [submitting, setSubmitting] = useState(false);
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState(initialError);
+  const [importingPublicMemory, setImportingPublicMemory] = useState(false);
+  const [importResult, setImportResult] = useState<string>("");
+  const [importSources, setImportSources] = useState<PublicMemoryImportSource[]>([
+    "identity",
+    "companies",
+    "hobbies",
+    "library",
+    "public_journal",
+  ]);
 
   const hsakaaCount = useMemo(
     () =>
@@ -116,6 +130,51 @@ export function MemoryInbox({
         .length,
     [items],
   );
+
+  function toggleImportSource(source: PublicMemoryImportSource) {
+    setImportSources((current) =>
+      current.includes(source)
+        ? current.filter((item) => item !== source)
+        : [...current, source],
+    );
+  }
+
+  async function handleGeneratePublicMemory() {
+    if (!importSources.length) {
+      setError("Choose at least one backend source to scan.");
+      return;
+    }
+
+    setImportingPublicMemory(true);
+    setError("");
+    setImportResult("");
+
+    try {
+      const result = await generatePublicMemoryCandidates({
+        sources: importSources,
+        maxCandidates: 60,
+      });
+
+      setItems((current) => {
+        const byId = new Map(current.map((item) => [item._id, item]));
+        for (const item of result.items ?? []) byId.set(item._id, item);
+        return Array.from(byId.values());
+      });
+      setPendingCount((current) => current + (result.stagedCandidates ?? 0));
+      setImportResult(
+        `Scanned ${result.scannedSources} source records. ${result.stagedCandidates} public-memory candidates were added for review${result.duplicatesSkipped ? `; ${result.duplicatesSkipped} duplicate${result.duplicatesSkipped === 1 ? "" : "s"} skipped` : ""}.`,
+      );
+      router.refresh();
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Unable to generate Public Memory candidates.",
+      );
+    } finally {
+      setImportingPublicMemory(false);
+    }
+  }
 
   async function handleCapture(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -162,7 +221,7 @@ export function MemoryInbox({
         captureOrigin: MemoryCaptureOrigin.MANUAL,
         durability,
         sensitivity,
-        accessLevel: MemoryAccessLevel.OWNER_ONLY,
+        accessLevel,
         verificationStatus: MemoryVerificationStatus.UNVERIFIED,
         categories: splitLabels(categories),
         tags: splitLabels(tags),
@@ -184,6 +243,7 @@ export function MemoryInbox({
       });
       setPendingCount((current) => current + 1);
       setContent("");
+      setAccessLevel(MemoryAccessLevel.OWNER_ONLY);
       setScope(MemoryScope.GENERAL);
       setIndividualPersonId("");
       setGroupPersonIds([]);
@@ -284,6 +344,73 @@ export function MemoryInbox({
               <div className="mt-1 text-2xl font-black text-[#C6FF32]">
                 {hsakaaCount}
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-white/10 p-5 sm:p-7">
+        <div className="rounded-2xl border border-[#C6FF32]/20 bg-[#C6FF32]/[0.035] p-4 sm:p-5">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-[#C6FF32]/10 p-2 text-[#C6FF32]">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-black text-white">
+                Import Public Memory from Personal OS
+              </div>
+              <p className="mt-1 text-xs leading-5 text-white/45">
+                Scan existing backend records and generate review candidates. Nothing becomes active Public Memory until you accept it. Health and Media are never scanned here.
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                {[
+                  ["identity", "Identity"],
+                  ["companies", "Companies"],
+                  ["hobbies", "Hobbies"],
+                  ["library", "Public Library"],
+                  ["public_journal", "Public Journal"],
+                ].map(([value, label]) => {
+                  const source = value as PublicMemoryImportSource;
+                  const checked = importSources.includes(source);
+
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => toggleImportSource(source)}
+                      className={
+                        checked
+                          ? "rounded-xl border border-[#C6FF32]/30 bg-[#C6FF32]/10 px-3 py-2 text-left text-xs font-black text-[#C6FF32]"
+                          : "rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left text-xs font-bold text-white/45"
+                      }
+                    >
+                      {checked ? "✓ " : ""}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={importingPublicMemory || importSources.length === 0}
+                onClick={handleGeneratePublicMemory}
+                className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-[#C6FF32] px-4 text-xs font-black text-[#030608] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {importingPublicMemory ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Generate Public Memory Candidates
+              </button>
+
+              {importResult ? (
+                <p className="mt-3 text-xs leading-5 text-[#C6FF32]/75">
+                  {importResult}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -397,6 +524,46 @@ export function MemoryInbox({
             ) : null}
           </div>
 
+          <div className="mt-3 rounded-2xl border border-white/10 bg-black/15 p-4">
+            <div className="text-xs font-black uppercase tracking-[0.14em] text-white/40">
+              Visibility
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {[
+                [MemoryAccessLevel.PUBLIC, "Public memory"],
+                [MemoryAccessLevel.OWNER_ONLY, "Private memory"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
+                    const nextAccessLevel = value as MemoryAccessLevel;
+                    setAccessLevel(nextAccessLevel);
+                    if (nextAccessLevel === MemoryAccessLevel.PUBLIC) {
+                      setScope(MemoryScope.GENERAL);
+                      setIndividualPersonId("");
+                      setGroupPersonIds([]);
+                      setSensitivity(MemorySensitivity.NORMAL);
+                    }
+                    setError("");
+                  }}
+                  className={`min-h-10 rounded-xl border px-3 text-xs font-black transition ${
+                    accessLevel === value
+                      ? "border-[#C6FF32]/40 bg-[#C6FF32]/10 text-[#C6FF32]"
+                      : "border-white/10 text-white/45 hover:bg-white/5"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-xs leading-5 text-white/35">
+              {accessLevel === MemoryAccessLevel.PUBLIC
+                ? "Public memory becomes available to anonymous HSAKAA only after you accept it. Keep it normal-sensitivity and safe to say to anyone."
+                : "Private memory stays owner-only and is never part of anonymous public recall."}
+            </p>
+          </div>
+
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="space-y-1.5 text-xs font-bold text-white/50">
               Type
@@ -439,7 +606,8 @@ export function MemoryInbox({
                 onChange={(event) =>
                   setSensitivity(event.target.value as MemorySensitivity)
                 }
-                className="w-full rounded-xl border border-white/10 bg-[#030608] px-3 py-2.5 text-sm text-white outline-none"
+                disabled={accessLevel === MemoryAccessLevel.PUBLIC}
+                className="w-full rounded-xl border border-white/10 bg-[#030608] px-3 py-2.5 text-sm text-white outline-none disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {Object.values(MemorySensitivity).map((value) => (
                   <option key={value} value={value}>
@@ -538,6 +706,8 @@ export function MemoryInbox({
                 const busy = actionId === item._id;
                 const isHsakaa =
                   item.captureOrigin === MemoryCaptureOrigin.HSAKAA;
+                const isSystem =
+                  item.captureOrigin === MemoryCaptureOrigin.SYSTEM;
 
                 return (
                   <article
@@ -556,6 +726,10 @@ export function MemoryInbox({
                           <span className="inline-flex items-center gap-1">
                             <Sparkles className="h-3 w-3" /> HSAKAA proposal
                           </span>
+                        ) : isSystem ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> Backend import
+                          </span>
                         ) : (
                           "Manual capture"
                         )}
@@ -570,6 +744,17 @@ export function MemoryInbox({
                       </span>
                       <span className="rounded-full bg-white/5 px-2 py-1 text-white/45">
                         {getMemoryTypeLabel(item.type)}
+                      </span>
+                      <span
+                        className={
+                          item.accessLevel === MemoryAccessLevel.PUBLIC
+                            ? "rounded-full bg-[#C6FF32]/10 px-2 py-1 text-[#C6FF32]"
+                            : "rounded-full bg-white/5 px-2 py-1 text-white/45"
+                        }
+                      >
+                        {item.accessLevel === MemoryAccessLevel.PUBLIC
+                          ? "Public memory"
+                          : "Private memory"}
                       </span>
                       <span className="rounded-full bg-white/5 px-2 py-1 text-white/45">
                         {formatEnum(item.durability)}
@@ -605,6 +790,9 @@ export function MemoryInbox({
                       </span>
                       <span>
                         Confidence {Math.round(item.confidence * 100)}%
+                      </span>
+                      <span>
+                        Source {formatEnum(item.sourceReference?.entityType ?? item.source)}
                       </span>
                     </div>
 

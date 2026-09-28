@@ -1108,6 +1108,70 @@ export interface MediaAccountGrowthSummary {
   latestCapturedAt?: string;
 }
 
+export type MediaMetricSnapshotPeriod =
+  | "1_hour"
+  | "24_hours"
+  | "48_hours"
+  | "72_hours"
+  | "96_hours"
+  | "7_days"
+  | "30_days"
+  | "latest";
+
+export interface MediaManualPublicationMetrics {
+  period?: MediaMetricSnapshotPeriod;
+  capturedAt?: string;
+  impressions?: number;
+  reach?: number;
+  views?: number;
+  engagedViews?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  saves?: number;
+  sends?: number;
+  clicks?: number;
+  profileVisits?: number;
+  followersGained?: number;
+  followersLost?: number;
+  leadsGenerated?: number;
+  conversions?: number;
+  watchTimeSeconds?: number;
+  averageViewDurationSeconds?: number;
+  averageWatchPercentage?: number;
+  notes?: string;
+}
+
+export interface CreateManualMediaEntryPayload {
+  platform: MediaPlatform;
+  format: MediaPostType;
+  title: string;
+  publishedAt: string;
+  accountId?: string;
+  externalPostUrl?: string;
+  platformPostId?: string;
+  hook?: string;
+  caption?: string;
+  script?: string;
+  description?: string;
+  cta?: string;
+  thesis?: string;
+  canonicalBody?: string;
+  story?: string;
+  contentPillars?: string[];
+  audiences?: string[];
+  goals?: MediaGoal[];
+  metrics?: MediaManualPublicationMetrics;
+}
+
+export interface MediaManualEntryResponse {
+  contentItem: MediaContentItem;
+  publication: MediaPublication;
+  snapshot?: Record<string, unknown> | null;
+  performance?: { analyzed?: number } | null;
+  growthLearnings?: { generatedLearnings?: number } | null;
+}
+
 export interface MediaGrowthOverview {
   generatedAt: string;
   rangeDays: number;
@@ -1489,6 +1553,15 @@ export interface MediaPresenceContextOverview {
     missingSources: string[];
   };
   companies: MediaWorldCompanyContext[];
+  hsakaaAid?: {
+    name: "HSAKAA Aid";
+    startsAt: string;
+    monthlyAllocationInr: number;
+    reviewTargetHours: number;
+    applicationSurface: "hsakaa_chat";
+    humanApprovalRequired: true;
+    publicContentRules: string[];
+  };
   hsakaa: {
     latestBrief?: {
       headline: string;
@@ -1589,7 +1662,8 @@ export type MediaPublicIdentityPillar =
   | "ideas_thinking"
   | "learning_experiments"
   | "building_aakash"
-  | "human_unfiltered";
+  | "human_unfiltered"
+  | "hsakaa_aid";
 
 export interface MediaPlanningOpportunity {
   key: string;
@@ -1962,7 +2036,7 @@ export interface MediaPerformanceInsight {
   contentItemId?: string;
   platform: MediaPlatform;
   format: MediaPostType;
-  period: "1_hour" | "24_hours" | "72_hours" | "7_days" | "30_days" | "latest";
+  period: MediaMetricSnapshotPeriod;
   percentile: number;
   confidence: number;
   identityPillar: MediaPublicIdentityPillar;
@@ -1980,6 +2054,25 @@ export interface MediaPerformanceInsight {
   nextExperiment: string;
   mechanisms: string[];
   evidence: Record<string, unknown>;
+  management?: {
+    dataConfidence: "low" | "medium" | "high";
+    baselineSamples: number;
+    percentile: number;
+    performanceScore: number;
+    pin: {
+      decision: "pin" | "do_not_pin" | "wait";
+      reason: string;
+    };
+    boost: {
+      decision: "boost" | "do_not_boost" | "wait";
+      reason: string;
+      suggestedTestBudgetInr?: number;
+      automaticSpend: false;
+    };
+    changes: string[];
+    repurposeIdeas: string[];
+    nextExperiment: string;
+  };
   generatedAt: string;
 }
 
@@ -2006,7 +2099,57 @@ export interface MediaLifecycleDueItem {
   format: MediaPostType;
   title: string;
   publishedAt?: string;
-  period: "1_hour" | "24_hours" | "72_hours" | "7_days" | "30_days";
+  period: Exclude<MediaMetricSnapshotPeriod, "latest">;
+}
+
+export interface MediaManualAnalyticsCheckpoint {
+  period: "48_hours" | "96_hours";
+  dueAt?: string;
+  state: "waiting" | "due" | "complete";
+  capturedAt?: string;
+  metrics?: {
+    impressions: number;
+    reach: number;
+    views: number;
+    likes: number;
+    comments: number;
+    shares: number;
+    saves: number;
+    sends: number;
+    clicks: number;
+    profileVisits: number;
+    followersGained: number;
+    watchTimeSeconds: number;
+    averageWatchPercentage?: number;
+    performanceScore: number;
+  };
+}
+
+export interface MediaManualAnalyticsQueueItem {
+  publicationId: string;
+  contentItemId: string;
+  accountId?: string;
+  platform: MediaPlatform;
+  format: MediaPostType;
+  status: MediaPostStatus;
+  deliveryStatus: MediaDeliveryStatus;
+  title: string;
+  hook?: string;
+  caption?: string;
+  cta?: string;
+  scheduledAt?: string;
+  publishedAt?: string;
+  manualPublishCompletedAt?: string;
+  analyticsAnchorAt?: string;
+  externalPostUrl?: string;
+  fortyEightHours: MediaManualAnalyticsCheckpoint;
+  ninetySixHours: MediaManualAnalyticsCheckpoint;
+}
+
+export interface MediaManualAnalyticsQueue {
+  generatedAt: string;
+  checkpoints: Array<"48_hours" | "96_hours">;
+  items: MediaManualAnalyticsQueueItem[];
 }
 
 export interface MediaLearningOverview {
@@ -2571,6 +2714,7 @@ export interface MediaSocialProfile {
   profileImageUrl?: string;
   bannerUrl?: string;
   websiteUrl?: string;
+  pinnedPublicationIds: string[];
   followerCount?: number;
   followingCount?: number;
   mediaCount?: number;
@@ -2646,6 +2790,41 @@ export interface MediaSocialProfileImageAudit {
   confidence: "low" | "medium" | "high";
 }
 
+export type MediaProfilePinAction =
+  | "pin"
+  | "keep_pinned"
+  | "unpin"
+  | "wait";
+
+export interface MediaProfileManagerAction {
+  publicationId: string;
+  title: string;
+  hook: string;
+  url: string;
+  format: string;
+  identityPillar: string;
+  action: MediaProfilePinAction;
+  reason: string;
+  percentile: number | null;
+  analyticsConfidence: number | null;
+}
+
+export interface MediaProfileManagerPlan {
+  platform: MediaPlatform;
+  objective: string;
+  pinnedCapacity: number;
+  currentPinnedPublicationIds: string[];
+  recommendedPinnedPublicationIds: string[];
+  recommendedHeadline: string;
+  recommendedBio: string;
+  recommendedLink: string;
+  recommendedProfileImageDirection: string;
+  recommendedBannerDirection: string;
+  actions: MediaProfileManagerAction[];
+  profileNeeds: string[];
+  confidence: "low" | "medium" | "high";
+}
+
 export interface MediaSocialPresencePlatformReview {
   platform: MediaPlatform;
   connected: boolean;
@@ -2665,6 +2844,7 @@ export interface MediaSocialPresencePlatformReview {
   launchPlan: MediaLaunchProfilePlan | null;
   audit: MediaSocialProfileTextAudit;
   photoAudit: MediaSocialProfileImageAudit;
+  profileManager?: MediaProfileManagerPlan;
   changeRecommended: boolean;
 }
 

@@ -8,6 +8,7 @@ import {
   Building2,
   Clock,
   HeartPulse,
+  HandHeart,
   Home,
   Newspaper,
   Radio,
@@ -83,6 +84,12 @@ const items = [
     icon: HeartPulse,
   },
   {
+    title: "Aid",
+    subtitle: "HSAKAA assistance fund",
+    href: "/aid",
+    icon: HandHeart,
+  },
+  {
     title: "Media",
     subtitle: "Social footprint",
     href: "/media",
@@ -130,7 +137,7 @@ export function CommandPalette({
         setQuery("");
       }
     },
-    [onOpenChange]
+    [onOpenChange],
   );
 
   const closePalette = useCallback(() => {
@@ -154,10 +161,7 @@ export function CommandPalette({
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLowerCase() === "k"
-      ) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setOpen(!open);
         return;
@@ -262,9 +266,7 @@ export function CommandPalette({
                 </div>
 
                 <div className="min-w-0">
-                  <p className="truncate font-bold text-white">
-                    {item.title}
-                  </p>
+                  <p className="truncate font-bold text-white">{item.title}</p>
 
                   <p className="mt-1 truncate text-xs text-white/35">
                     {item.subtitle}
@@ -277,9 +279,7 @@ export function CommandPalette({
           {filtered.length === 0 && (
             <div className="grid min-h-48 place-items-center px-6 text-center">
               <div>
-                <p className="text-lg font-bold text-white">
-                  No results found
-                </p>
+                <p className="text-lg font-bold text-white">No results found</p>
 
                 <p className="mt-2 text-sm text-white/40">
                   Try another page, company, journal entry, or book.

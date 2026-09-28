@@ -1,11 +1,5 @@
 export type HsakaaMode =
-  | "Chat"
-  | "Companies"
-  | "Journal"
-  | "Library"
-  | "Health"
-  | "Media"
-  | "Memory";
+  "Chat" | "Companies" | "Journal" | "Library" | "Health" | "Media" | "Memory";
 
 export type HsakaaChatRequest = {
   mode: HsakaaMode;
@@ -13,13 +7,22 @@ export type HsakaaChatRequest = {
   conversationId?: string;
 };
 
+export type HsakaaFundState = {
+  active: boolean;
+  caseId?: string;
+  caseReference?: string;
+  status?: string;
+  reviewTargetAt?: string | null;
+  contactCaptureStarted?: boolean;
+  canUploadEvidence?: boolean;
+  startsAt: string;
+  monthlyAllocation: number;
+  humanApprovalRequired: true;
+  reviewTargetHours: number;
+};
+
 export type HsakaaActionStatus =
-  | "pending"
-  | "executing"
-  | "executed"
-  | "rejected"
-  | "failed"
-  | "expired";
+  "pending" | "executing" | "executed" | "rejected" | "failed" | "expired";
 
 export type HsakaaProposedAction = {
   id: string;
@@ -68,7 +71,8 @@ export type HsakaaChatResponse = {
   answer: string;
   conversationId: string;
   messageId?: string;
-  scope?: "private";
+  scope?: "private" | "fund";
+  fund?: HsakaaFundState;
   ai?: {
     model: string;
     toolsUsed: string[];
@@ -105,13 +109,7 @@ export type PrivateHsakaaConversationMessage = {
 };
 
 export type MyChatChannel =
-  | "whatsapp"
-  | "instagram"
-  | "linkedin"
-  | "x"
-  | "slack"
-  | "sms"
-  | "other";
+  "whatsapp" | "instagram" | "linkedin" | "x" | "slack" | "sms" | "other";
 
 export type MyChatAuthor = "owner" | "person" | "other";
 
@@ -155,82 +153,59 @@ export type ImportMyChatRequest = {
   }>;
 };
 
-const SESSION_STORAGE_KEY =
-  "hsakaa_public_session_id";
+const SESSION_STORAGE_KEY = "hsakaa_public_session_id";
 
-function getOrCreateSessionId() {
-  const existing =
-    window.localStorage.getItem(
-      SESSION_STORAGE_KEY,
-    );
+export function getOrCreateHsakaaSessionId() {
+  const existing = window.localStorage.getItem(SESSION_STORAGE_KEY);
 
   if (existing) {
     return existing;
   }
 
-  const sessionId =
-    window.crypto.randomUUID();
+  const sessionId = window.crypto.randomUUID();
 
-  window.localStorage.setItem(
-    SESSION_STORAGE_KEY,
-    sessionId,
-  );
+  window.localStorage.setItem(SESSION_STORAGE_KEY, sessionId);
 
   return sessionId;
 }
 
 async function readJson<T>(response: Response) {
   return (await response.json().catch(() => null)) as
-    | (Partial<T> & { message?: string })
-    | null;
+    (Partial<T> & { message?: string }) | null;
 }
 
-export async function askHsakaa(
-  data: HsakaaChatRequest,
-) {
-  const response = await fetch(
-    "/api/hsakaa",
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...data,
-        sessionId:
-          getOrCreateSessionId(),
-      }),
+export async function askHsakaa(data: HsakaaChatRequest) {
+  const response = await fetch("/api/hsakaa", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify({
+      ...data,
+      sessionId: getOrCreateHsakaaSessionId(),
+    }),
+  });
 
-  const payload =
-    await readJson<HsakaaChatResponse>(response);
+  const payload = await readJson<HsakaaChatResponse>(response);
 
   if (!response.ok) {
-    throw new Error(
-      payload?.message ||
-        "HSAKAA request failed.",
-    );
+    throw new Error(payload?.message || "HSAKAA request failed.");
   }
 
-  if (
-    !payload?.answer ||
-    !payload.conversationId
-  ) {
-    throw new Error(
-      "HSAKAA returned an invalid response.",
-    );
+  if (!payload?.answer || !payload.conversationId) {
+    throw new Error("HSAKAA returned an invalid response.");
   }
 
   return payload as HsakaaChatResponse;
 }
 
-
 async function readSpeechResponse(response: Response) {
   if (!response.ok) {
     const payload = await readJson<{ message: string }>(response);
-    throw new Error(payload?.message || "Aakash voice is unavailable right now.");
+    throw new Error(
+      payload?.message || "Aakash voice is unavailable right now.",
+    );
   }
 
   return response.blob();
@@ -248,7 +223,7 @@ export async function getHsakaaSpeechAudio(data: {
     },
     body: JSON.stringify({
       ...data,
-      sessionId: getOrCreateSessionId(),
+      sessionId: getOrCreateHsakaaSessionId(),
     }),
   });
 
@@ -271,39 +246,25 @@ export async function getVerifiedPersonHsakaaSpeechAudio(data: {
   return readSpeechResponse(response);
 }
 
-export async function askPrivateHsakaa(
-  data: HsakaaChatRequest,
-) {
-  const response = await fetch(
-    "/api/admin/backend/hsakaa/private/ask",
-    {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify(data),
+export async function askPrivateHsakaa(data: HsakaaChatRequest) {
+  const response = await fetch("/api/admin/backend/hsakaa/private/ask", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
     },
-  );
+    credentials: "include",
+    body: JSON.stringify(data),
+  });
 
-  const payload =
-    await readJson<HsakaaChatResponse>(response);
+  const payload = await readJson<HsakaaChatResponse>(response);
 
   if (!response.ok) {
-    throw new Error(
-      payload?.message ||
-        "Private HSAKAA request failed.",
-    );
+    throw new Error(payload?.message || "Private HSAKAA request failed.");
   }
 
-  if (
-    !payload?.answer ||
-    !payload.conversationId
-  ) {
-    throw new Error(
-      "Private HSAKAA returned an invalid response.",
-    );
+  if (!payload?.answer || !payload.conversationId) {
+    throw new Error("Private HSAKAA returned an invalid response.");
   }
 
   return payload as HsakaaChatResponse;
@@ -327,20 +288,16 @@ async function respondToPrivateAction(
     },
   );
 
-  const payload =
-    await readJson<HsakaaActionResponse>(response);
+  const payload = await readJson<HsakaaActionResponse>(response);
 
   if (!response.ok) {
     throw new Error(
-      payload?.message ||
-        `Could not ${decision} the HSAKAA action.`,
+      payload?.message || `Could not ${decision} the HSAKAA action.`,
     );
   }
 
   if (!payload?.action || !payload.message) {
-    throw new Error(
-      "HSAKAA returned an invalid action response.",
-    );
+    throw new Error("HSAKAA returned an invalid action response.");
   }
 
   return payload as HsakaaActionResponse;
@@ -350,24 +307,15 @@ export function confirmPrivateHsakaaAction(
   actionId: string,
   confirmationToken: string,
 ) {
-  return respondToPrivateAction(
-    actionId,
-    confirmationToken,
-    "confirm",
-  );
+  return respondToPrivateAction(actionId, confirmationToken, "confirm");
 }
 
 export function rejectPrivateHsakaaAction(
   actionId: string,
   confirmationToken: string,
 ) {
-  return respondToPrivateAction(
-    actionId,
-    confirmationToken,
-    "reject",
-  );
+  return respondToPrivateAction(actionId, confirmationToken, "reject");
 }
-
 
 export async function getPrivateHsakaaConversations(params?: {
   page?: number;
@@ -392,7 +340,9 @@ export async function getPrivateHsakaaConversations(params?: {
   }>(response);
 
   if (!response.ok || !payload?.data) {
-    throw new Error(payload?.message || "Could not load private conversations.");
+    throw new Error(
+      payload?.message || "Could not load private conversations.",
+    );
   }
   return payload as {
     data: PrivateHsakaaConversationSummary[];
@@ -479,7 +429,10 @@ export async function importMyChat(data: ImportMyChatRequest) {
     "/api/admin/backend/hsakaa/private/my-chats/import",
     {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
       credentials: "include",
       body: JSON.stringify(data),
     },
@@ -519,18 +472,22 @@ export async function refreshMyChatLearning(personId?: string) {
     "/api/admin/backend/hsakaa/private/my-chats/refresh-learning",
     {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
       credentials: "include",
       body: JSON.stringify(personId ? { personId } : {}),
     },
   );
   const payload = await readJson<Record<string, unknown>>(response);
   if (!response.ok) {
-    throw new Error(payload?.message || "Could not refresh communication learning.");
+    throw new Error(
+      payload?.message || "Could not refresh communication learning.",
+    );
   }
   return payload as Record<string, unknown>;
 }
-
 
 export type HsakaaBriefSignal = {
   status: "good" | "watch" | "attention" | "unknown";
@@ -571,13 +528,7 @@ export type HsakaaDailyBriefResponse = {
     suggestedActions: Array<{
       title: string;
       reason: string;
-      kind:
-        | "task"
-        | "brain_dump"
-        | "journal"
-        | "memory"
-        | "reminder"
-        | "none";
+      kind: "task" | "brain_dump" | "journal" | "memory" | "reminder" | "none";
       prompt: string;
     }>;
   };
@@ -592,9 +543,7 @@ export type HsakaaDailyBriefResponse = {
   };
 };
 
-async function loadPrivateBrief(
-  method: "GET" | "POST",
-) {
+async function loadPrivateBrief(method: "GET" | "POST") {
   const response = await fetch(
     `/api/admin/backend/hsakaa/private/brief/today${
       method === "POST" ? "/refresh" : ""
@@ -607,20 +556,16 @@ async function loadPrivateBrief(
     },
   );
 
-  const payload =
-    await readJson<HsakaaDailyBriefResponse>(response);
+  const payload = await readJson<HsakaaDailyBriefResponse>(response);
 
   if (!response.ok) {
     throw new Error(
-      payload?.message ||
-        "Could not load the HSAKAA Daily Brief.",
+      payload?.message || "Could not load the HSAKAA Daily Brief.",
     );
   }
 
   if (!payload?.content || !payload.dateKey) {
-    throw new Error(
-      "HSAKAA returned an invalid Daily Brief.",
-    );
+    throw new Error("HSAKAA returned an invalid Daily Brief.");
   }
 
   return payload as HsakaaDailyBriefResponse;
@@ -818,11 +763,7 @@ export function getPrivateHsakaaWeeklyReview(options?: { refresh?: boolean }) {
   return loadPrivateWeeklyReview(options?.refresh ? "POST" : "GET");
 }
 
-export type HsakaaDecisionHorizon =
-  | "today"
-  | "weeks"
-  | "months"
-  | "years";
+export type HsakaaDecisionHorizon = "today" | "weeks" | "months" | "years";
 
 export type HsakaaDecisionOptionInput = {
   label: string;
@@ -837,11 +778,7 @@ export type HsakaaDecisionEvidence = {
 };
 
 export type HsakaaDecisionOutcomeStatus =
-  | "positive"
-  | "mixed"
-  | "negative"
-  | "too_early"
-  | "abandoned";
+  "positive" | "mixed" | "negative" | "too_early" | "abandoned";
 
 export type HsakaaDecisionCalibrationLabel =
   | "well_calibrated"
@@ -857,14 +794,9 @@ export type HsakaaDecisionOutcomeVerdict =
   | "abandoned";
 
 export type HsakaaDecisionType =
-  | "reversible"
-  | "partially_reversible"
-  | "hard_to_reverse";
+  "reversible" | "partially_reversible" | "hard_to_reverse";
 
-export type HsakaaDecisionLearningStatus =
-  | "positive"
-  | "mixed"
-  | "negative";
+export type HsakaaDecisionLearningStatus = "positive" | "mixed" | "negative";
 
 export type HsakaaDecisionLearningReference = {
   id?: string;
@@ -918,26 +850,17 @@ export type HsakaaDecisionLearningLibraryResponse = {
 };
 
 export type HsakaaDecisionAssumptionStatus =
-  | "untested"
-  | "testing"
-  | "supported"
-  | "weakened"
-  | "invalidated";
+  "untested" | "testing" | "supported" | "weakened" | "invalidated";
 
 export type HsakaaDecisionAssumptionImportance = "high" | "medium" | "low";
 export type HsakaaDecisionExperimentStatus =
-  | "planned"
-  | "active"
-  | "awaiting_result"
-  | "completed"
-  | "cancelled";
+  "planned" | "active" | "awaiting_result" | "completed" | "cancelled";
 export type HsakaaDecisionExperimentResult =
-  | "supported"
-  | "mixed"
-  | "failed"
-  | "inconclusive";
-export type HsakaaDecisionEvidenceKind = "observation" | "metric" | "note" | "source";
-export type HsakaaDecisionEvidenceStance = "supports" | "contradicts" | "neutral";
+  "supported" | "mixed" | "failed" | "inconclusive";
+export type HsakaaDecisionEvidenceKind =
+  "observation" | "metric" | "note" | "source";
+export type HsakaaDecisionEvidenceStance =
+  "supports" | "contradicts" | "neutral";
 
 export type HsakaaDecisionTrackedAssumption = {
   id: string;
@@ -1045,10 +968,7 @@ export type HsakaaDecisionResponse = {
   horizon: HsakaaDecisionHorizon;
   analysis: {
     summary: string;
-    decisionType:
-      | "reversible"
-      | "partially_reversible"
-      | "hard_to_reverse";
+    decisionType: "reversible" | "partially_reversible" | "hard_to_reverse";
     recommendation: {
       optionId?: string | null;
       confidence: number;
@@ -1218,7 +1138,9 @@ export async function getPrivateHsakaaDecision(decisionId: string) {
 
   const payload = await readJson<HsakaaDecisionResponse>(response);
   if (!response.ok) {
-    throw new Error(payload?.message || "Could not load this decision analysis.");
+    throw new Error(
+      payload?.message || "Could not load this decision analysis.",
+    );
   }
   if (!payload?.analysis || !payload.question) {
     throw new Error("HSAKAA returned an invalid decision analysis.");
@@ -1319,7 +1241,8 @@ export type HsakaaDecisionAnalytics = {
     averageConfidence: number | null;
     observedSuccessRate: number | null;
     calibrationGap: number | null;
-    calibration: "insufficient" | "overconfident" | "underconfident" | "well_calibrated";
+    calibration:
+      "insufficient" | "overconfident" | "underconfident" | "well_calibrated";
   }>;
   choicesVsHsakaa: {
     followed: {
@@ -1413,10 +1336,7 @@ export type HsakaaDecisionAnalytics = {
 };
 
 export type HsakaaDecisionReviewBucket =
-  | "overdue"
-  | "due_today"
-  | "upcoming"
-  | "unscheduled";
+  "overdue" | "due_today" | "upcoming" | "unscheduled";
 
 export type HsakaaDecisionReviewQueueItem = {
   id?: string;
@@ -1478,7 +1398,9 @@ export async function recordPrivateHsakaaDecisionCommitment(
 
   const payload = await readJson<HsakaaDecisionResponse>(response);
   if (!response.ok) {
-    throw new Error(payload?.message || "Could not record this decision choice.");
+    throw new Error(
+      payload?.message || "Could not record this decision choice.",
+    );
   }
   return payload as HsakaaDecisionResponse;
 }
@@ -1559,7 +1481,9 @@ export async function getPrivateHsakaaDecisionReviewQueue() {
 
   const payload = await readJson<HsakaaDecisionReviewQueue>(response);
   if (!response.ok) {
-    throw new Error(payload?.message || "Could not load decision review queue.");
+    throw new Error(
+      payload?.message || "Could not load decision review queue.",
+    );
   }
   return payload as HsakaaDecisionReviewQueue;
 }
@@ -1623,7 +1547,9 @@ export async function reschedulePrivateHsakaaDecisionReview(
 
   const payload = await readJson<HsakaaDecisionResponse>(response);
   if (!response.ok) {
-    throw new Error(payload?.message || "Could not reschedule this decision review.");
+    throw new Error(
+      payload?.message || "Could not reschedule this decision review.",
+    );
   }
   return payload as HsakaaDecisionResponse;
 }
@@ -1662,20 +1588,25 @@ async function decisionExperimentRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`/api/admin/backend/hsakaa/private/decisions${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...(init?.headers ?? {}),
+  const response = await fetch(
+    `/api/admin/backend/hsakaa/private/decisions${path}`,
+    {
+      ...init,
+      headers: {
+        Accept: "application/json",
+        ...(init?.body ? { "Content-Type": "application/json" } : {}),
+        ...(init?.headers ?? {}),
+      },
+      credentials: "include",
+      cache: init?.method && init.method !== "GET" ? undefined : "no-store",
     },
-    credentials: "include",
-    cache: init?.method && init.method !== "GET" ? undefined : "no-store",
-  });
+  );
   const payload = await readJson<T>(response);
   if (!response.ok) {
     const errorPayload = payload as { message?: string } | null;
-    throw new Error(errorPayload?.message || "Decision experiment request failed.");
+    throw new Error(
+      errorPayload?.message || "Decision experiment request failed.",
+    );
   }
   return payload as T;
 }
@@ -1783,7 +1714,6 @@ export function reassessPrivateHsakaaDecision(
   );
 }
 
-
 export type HsakaaVerifiedPerson = {
   id: string;
   name: string;
@@ -1885,7 +1815,10 @@ export async function askVerifiedPersonHsakaa(data: HsakaaChatRequest) {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      ...data,
+      sessionId: getOrCreateHsakaaSessionId(),
+    }),
   });
 
   const payload = await readJson<HsakaaChatResponse>(response);
@@ -1899,4 +1832,49 @@ export async function askVerifiedPersonHsakaa(data: HsakaaChatRequest) {
   }
 
   return payload as HsakaaChatResponse;
+}
+
+export async function uploadHsakaaFundEvidence(data: {
+  caseId: string;
+  files: File[];
+}) {
+  const form = new FormData();
+  form.set("sessionId", getOrCreateHsakaaSessionId());
+  form.set("caseId", data.caseId);
+  data.files.forEach((file) => form.append("files", file));
+
+  const response = await fetch("/api/fund/evidence", {
+    method: "POST",
+    body: form,
+  });
+
+  const payload = await readJson<{
+    caseId: string;
+    caseReference: string;
+    message: string;
+    files: Array<{
+      evidenceId: string;
+      filename: string;
+      analysisAvailable: boolean;
+    }>;
+  }>(response);
+
+  if (!response.ok) {
+    throw new Error(payload?.message || "Unable to upload Fund evidence.");
+  }
+
+  if (!payload?.message || !payload.caseId) {
+    throw new Error("HSAKAA returned an invalid Fund evidence response.");
+  }
+
+  return payload as {
+    caseId: string;
+    caseReference: string;
+    message: string;
+    files: Array<{
+      evidenceId: string;
+      filename: string;
+      analysisAvailable: boolean;
+    }>;
+  };
 }

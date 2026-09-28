@@ -8,6 +8,7 @@ import {
   runMediaSocialPresenceReview,
   syncMediaSocialPresence,
   syncMediaSocialPresenceAccount,
+  updateMediaSocialPinnedPublications,
   updateMediaSocialRecommendation,
 } from "@/lib/api/media";
 import type {
@@ -113,8 +114,12 @@ function FieldComparison({
 
 function ProfileReview({
   review,
+  busy,
+  onApplyPins,
 }: {
   review?: MediaSocialPresencePlatformReview;
+  busy: boolean;
+  onApplyPins: (review: MediaSocialPresencePlatformReview) => void;
 }) {
   if (!review) {
     return (
@@ -173,6 +178,143 @@ function ProfileReview({
           </ul>
         ) : null}
       </div>
+      {review.profileManager ? (
+        <div className="rounded-2xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.035] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C6FF32]/60">
+                Profile manager
+              </p>
+              <p className="mt-1 text-sm font-black text-white">
+                What a new profile visitor should see
+              </p>
+            </div>
+            <Badge value={review.profileManager.confidence} />
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <div className="rounded-xl border border-white/8 bg-black/20 p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">
+                Profile photo direction
+              </p>
+              <p className="mt-2 text-sm leading-6 text-white/70">
+                {review.profileManager.recommendedProfileImageDirection}
+              </p>
+            </div>
+            {review.profileManager.recommendedBannerDirection ? (
+              <div className="rounded-xl border border-white/8 bg-black/20 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">
+                  Banner / channel art
+                </p>
+                <p className="mt-2 text-sm leading-6 text-white/70">
+                  {review.profileManager.recommendedBannerDirection}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          {review.profileManager.pinnedCapacity > 0 ? (
+            <div className="mt-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">
+                    Pin / feature decisions
+                  </p>
+                  <p className="mt-1 text-xs text-white/40">
+                    HSAKAA tracks up to {review.profileManager.pinnedCapacity} profile slot{review.profileManager.pinnedCapacity === 1 ? "" : "s"}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => onApplyPins(review)}
+                  className="rounded-xl border border-[#C6FF32]/25 px-3 py-2 text-[11px] font-black text-[#C6FF32] disabled:opacity-40"
+                >
+                  Mark suggested lineup applied
+                </button>
+              </div>
+
+              <div className="mt-3 space-y-2">
+                {review.profileManager.actions.length ? (
+                  review.profileManager.actions.map((action) => (
+                    <div
+                      key={`${action.action}-${action.publicationId}`}
+                      className="rounded-xl border border-white/8 bg-black/20 p-3"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={`text-[10px] font-black uppercase tracking-[0.16em] ${
+                              action.action === "unpin"
+                                ? "text-rose-200"
+                                : action.action === "wait"
+                                  ? "text-amber-200"
+                                  : "text-[#C6FF32]"
+                            }`}
+                          >
+                            {action.action.replaceAll("_", " ")}
+                          </p>
+                          <p className="mt-1 text-sm font-bold text-white/80">
+                            {action.title || action.hook || "Published post"}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-white/45">
+                            {action.reason}
+                          </p>
+                        </div>
+                        {action.url ? (
+                          <a
+                            href={action.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="shrink-0 text-[11px] font-black text-[#C6FF32]"
+                          >
+                            Open post ↗
+                          </a>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-white/30">
+                        {action.percentile !== null ? (
+                          <span>percentile {Math.round(action.percentile)}</span>
+                        ) : null}
+                        {action.analyticsConfidence !== null ? (
+                          <span>
+                            analytics confidence {Math.round(action.analyticsConfidence)}%
+                          </span>
+                        ) : null}
+                        {action.identityPillar ? (
+                          <span>{action.identityPillar.replaceAll("_", " ")}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="rounded-xl border border-dashed border-white/10 p-3 text-xs text-white/35">
+                    No pin change is justified yet. HSAKAA will wait for stronger 48h/96h evidence.
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {review.profileManager.profileNeeds.length ? (
+            <div className="mt-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/35">
+                Profile checklist
+              </p>
+              <ul className="mt-2 space-y-1 text-xs leading-5 text-white/55">
+                {review.profileManager.profileNeeds.map((item) => (
+                  <li key={item}>• {item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-white/10 p-4 text-xs leading-5 text-white/35">
+          Run a fresh profile review to generate analytics-aware pin, unpin, profile photo and profile setup guidance.
+        </div>
+      )}
+
       {review.audit.reasons.length ? (
         <div className="rounded-2xl border border-white/8 p-4">
           <p className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
@@ -357,6 +499,21 @@ export function MediaSocialPresenceManager({
     await runAction(`recommendation-${id}`, () =>
       updateMediaSocialRecommendation(id, status),
     );
+  }
+
+  async function applySuggestedPinLineup(
+    review: MediaSocialPresencePlatformReview,
+  ) {
+    const manager = review.profileManager;
+    if (!manager) return;
+    await runAction(`pins-${review.platform}`, async () => {
+      await updateMediaSocialPinnedPublications(
+        review.platform,
+        manager.recommendedPinnedPublicationIds,
+      );
+      await runMediaSocialPresenceReview(true);
+      setNotice(`${PLATFORM_LABEL[review.platform]} pin state updated in HSAKAA.`);
+    });
   }
 
   return (
@@ -544,7 +701,11 @@ export function MediaSocialPresenceManager({
                 ) : null}
 
                 <div className="mt-5">
-                  <ProfileReview review={review} />
+                  <ProfileReview
+                    review={review}
+                    busy={Boolean(busyKey)}
+                    onApplyPins={applySuggestedPinLineup}
+                  />
                 </div>
               </article>
             );

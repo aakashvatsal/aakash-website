@@ -186,6 +186,27 @@ export type MemoryInboxResponse = {
   pendingCount: number;
 };
 
+export type PublicMemoryImportSource =
+  | "identity"
+  | "companies"
+  | "hobbies"
+  | "library"
+  | "public_journal";
+
+export type GeneratePublicMemoryCandidatesPayload = {
+  sources?: PublicMemoryImportSource[];
+  maxCandidates?: number;
+};
+
+export type GeneratePublicMemoryCandidatesResponse = {
+  scannedSources: number;
+  generatedCandidates: number;
+  stagedCandidates: number;
+  duplicatesSkipped: number;
+  sourceBreakdown: Record<string, number>;
+  items: MemoryInboxItem[];
+};
+
 export type UpdateMemoryPayload =
   Partial<CreateMemoryPayload>;
 
@@ -714,6 +735,27 @@ export async function getMemoryInbox(
         ? candidate.pendingCount
         : data.filter((item) => item.status === MemoryInboxStatus.PENDING).length,
   };
+}
+
+export async function generatePublicMemoryCandidates(
+  payload: GeneratePublicMemoryCandidatesPayload = {},
+): Promise<GeneratePublicMemoryCandidatesResponse> {
+  const response = await fetch(
+    `${ADMIN_API_URL}/memory/inbox/generate-public-candidates`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const result = await readResponse<
+    | GeneratePublicMemoryCandidatesResponse
+    | ApiEnvelope<GeneratePublicMemoryCandidatesResponse>
+  >(response);
+
+  return unwrapResponse(result);
 }
 
 export async function captureMemoryInboxItem(

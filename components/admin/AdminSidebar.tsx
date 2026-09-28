@@ -11,6 +11,7 @@ import {
   Activity,
   Bot,
   BellRing,
+  BarChart3,
   BookOpen,
   Brain,
   Building2,
@@ -23,6 +24,7 @@ import {
   ExternalLink,
   FlaskConical,
   HeartPulse,
+  HandCoins,
   Pill,
   Utensils,
   LayoutDashboard,
@@ -175,6 +177,11 @@ const navigation: NavigationItem[] = [
         icon: TrendingUp,
       },
       {
+        title: "Content Analytics",
+        href: "/admin/media/analytics",
+        icon: BarChart3,
+      },
+      {
         title: "Network",
         href: "/admin/media/network",
         icon: Network,
@@ -215,6 +222,11 @@ const navigation: NavigationItem[] = [
     title: "Brain Dump",
     href: "/admin/brain-dump",
     icon: Brain,
+  },
+  {
+    title: "Fund",
+    href: "/admin/fund",
+    icon: HandCoins,
   },
   {
     title: "HSAKAA",
