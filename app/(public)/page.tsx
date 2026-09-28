@@ -1,4 +1,7 @@
+import type { Metadata } from "next";
+
 import { PublicHome } from "@/components/features/public-home/PublicHome";
+import { JsonLd } from "@/components/seo/JsonLd";
 
 import { getBooks, type LibraryApiResponse } from "@/lib/library";
 import { getPublicJournalEntries } from "@/lib/journal";
@@ -7,6 +10,22 @@ import { getMediaPosts } from "@/lib/media";
 import { getCompanies } from "@/lib/companies";
 import type { JournalListResponse } from "@/types/journal";
 import type { PublicMediaResponse } from "@/types/public-media";
+import {
+  DEFAULT_DESCRIPTION,
+  DEFAULT_TITLE,
+  PERSON_ID,
+  SITE_URL,
+  WEBSITE_ID,
+  buildPublicMetadata,
+} from "@/lib/seo/site";
+
+export const metadata: Metadata = buildPublicMetadata({
+  title: DEFAULT_TITLE,
+  description: DEFAULT_DESCRIPTION,
+  path: "/",
+  imageAlt: "Aakash Vatsal, founder, builder and creator of HSAKAA",
+  absoluteTitle: true,
+});
 
 export const dynamic = "force-dynamic";
 
@@ -84,13 +103,57 @@ export default async function Page() {
   const media = settledValue(mediaResult, emptyMedia, "media");
   const companies = settledValue(companiesResult, [], "companies");
 
+  const profileJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "@id": `${SITE_URL}/#profile`,
+    url: SITE_URL,
+    name: DEFAULT_TITLE,
+    description: DEFAULT_DESCRIPTION,
+    inLanguage: "en-IN",
+    mainEntity: {
+      "@type": "Person",
+      "@id": PERSON_ID,
+      name: "Aakash Vatsal",
+      url: SITE_URL,
+      jobTitle: "Founder and builder",
+      description:
+        "Founder and builder sharing the companies, systems, ideas and experiments behind his work and HSAKAA.",
+      sameAs: ["https://www.linkedin.com/in/aakashvatsal"],
+      knowsAbout: [
+        "Entrepreneurship",
+        "Product building",
+        "Sports technology",
+        "Logistics technology",
+        "Personal AI",
+      ],
+    },
+  };
+
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "@id": WEBSITE_ID,
+    url: SITE_URL,
+    name: "Aakash Vatsal",
+    description: DEFAULT_DESCRIPTION,
+    inLanguage: "en-IN",
+    publisher: {
+      "@id": PERSON_ID,
+    },
+  };
+
   return (
-    <PublicHome
-      books={books.data}
-      journals={journals.data}
-      health={health}
-      media={media.items}
-      companies={companies}
-    />
+    <>
+      <JsonLd data={profileJsonLd} />
+      <JsonLd data={websiteJsonLd} />
+      <PublicHome
+        books={books.data}
+        journals={journals.data}
+        health={health}
+        media={media.items}
+        companies={companies}
+      />
+    </>
   );
 }

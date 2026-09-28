@@ -36,6 +36,18 @@ export function PublicFooter() {
               Library
             </Link>
             <Link
+              href="/health"
+              className="text-sm text-white/45 hover:text-white"
+            >
+              Health
+            </Link>
+            <Link
+              href="/media"
+              className="text-sm text-white/45 hover:text-white"
+            >
+              Media
+            </Link>
+            <Link
               href="/now"
               className="text-sm text-white/45 hover:text-white"
             >
