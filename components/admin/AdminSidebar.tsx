@@ -157,6 +157,11 @@ const navigation: NavigationItem[] = [
         icon: Clock3,
       },
       {
+        title: "Media Brain",
+        href: "/admin/media/brain",
+        icon: Brain,
+      },
+      {
         title: "7-Day Plan",
         href: "/admin/media/plan",
         icon: CalendarDays,

@@ -85,6 +85,12 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
               Operations
             </Link>
             <Link
+              href="/admin/media/brain"
+              className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]"
+            >
+              Media Brain
+            </Link>
+            <Link
               href="/admin/media/analytics"
               className="rounded-xl border border-[#C6FF32]/30 px-4 py-2 text-sm font-bold text-[#C6FF32]"
             >

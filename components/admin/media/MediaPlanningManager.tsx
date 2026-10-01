@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Archive,
+  Brain,
   CalendarDays,
   Check,
   Clipboard,
@@ -25,7 +26,9 @@ import type {
   MediaPlanningDailyStory,
   MediaPlanningExecution,
   MediaPlanningGenerationJob,
+  MediaPlanningOpportunity,
   MediaPlanningOverview,
+  MediaPlanningStoryArc,
   MediaPlanningTimedDirection,
   MediaPlanningYoutubeCommunityPost,
   MediaPublicIdentityPillar,
@@ -246,6 +249,12 @@ export function MediaPlanningManager({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/media/brain"
+              className="rounded-xl border border-[#C6FF32]/20 px-3 py-2 text-xs font-bold text-[#C6FF32]"
+            >
+              <Brain className="mr-1 inline h-3.5 w-3.5" /> Media Brain
+            </Link>
             <Link
               href="/admin/media/production"
               className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-white/65"
@@ -601,6 +610,7 @@ export function MediaPlanningManager({
               <MediaPlanningDayCard
                 key={day.date}
                 day={day}
+                planContext={plan}
                 onRefresh={refreshDay}
                 refreshing={refreshingDate === day.date || isGenerating}
               />
@@ -661,7 +671,14 @@ function RecoveredPartialPlan({ job }: { job: MediaPlanningGenerationJob }) {
       </div>
       <div className="mt-4 space-y-4">
         {days.map((day) => (
-          <MediaPlanningDayCard key={`partial-${day.date}`} day={day} />
+          <MediaPlanningDayCard
+            key={`partial-${day.date}`}
+            day={day}
+            planContext={{
+              opportunities: safeArray(partial.opportunities),
+              storyArcs: safeArray(partial.storyArcs),
+            }}
+          />
         ))}
       </div>
     </section>
@@ -670,10 +687,12 @@ function RecoveredPartialPlan({ job }: { job: MediaPlanningGenerationJob }) {
 
 export function MediaPlanningDayCard({
   day,
+  planContext,
   onRefresh,
   refreshing = false,
 }: {
   day: MediaPlanningCycle["days"][number];
+  planContext?: Pick<MediaPlanningCycle, "opportunities" | "storyArcs">;
   onRefresh?: (date: string) => void | Promise<void>;
   refreshing?: boolean;
 }) {
@@ -711,7 +730,16 @@ export function MediaPlanningDayCard({
       </div>
       <div className="mt-4 grid gap-3 xl:grid-cols-2">
         {safeArray(day.executions).map((item) => (
-          <Execution key={`${day.date}-${item.platform}`} item={item} />
+          <Execution
+            key={`${day.date}-${item.platform}`}
+            item={item}
+            opportunity={safeArray(planContext?.opportunities).find(
+              (candidate) => candidate.key === item.opportunityKey,
+            )}
+            storyArc={safeArray(planContext?.storyArcs).find(
+              (candidate) => candidate.key === item.storyArcKey,
+            )}
+          />
         ))}
       </div>
       {safeArray(day.engagement).length ? (
@@ -1051,7 +1079,15 @@ function YoutubeCommunity({
   );
 }
 
-function Execution({ item }: { item: MediaPlanningExecution }) {
+function Execution({
+  item,
+  opportunity,
+  storyArc,
+}: {
+  item: MediaPlanningExecution;
+  opportunity?: MediaPlanningOpportunity;
+  storyArc?: MediaPlanningStoryArc;
+}) {
   const isSkip = item.action === "skip";
   const readinessIssues = safeArray(item.readinessIssues);
   const hashtags = safeArray(item.hashtags);
@@ -1164,6 +1200,56 @@ function Execution({ item }: { item: MediaPlanningExecution }) {
               {readinessIssues.join(" · ")}
             </div>
           ) : null}
+          <details className="rounded-xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-4 text-xs text-white/40">
+            <summary className="cursor-pointer select-none font-black text-[#C6FF32]">
+              Why HSAKAA chose this
+            </summary>
+            <div className="mt-4 space-y-4">
+              <SmallField label="Immediate reason" value={item.reason || "-"} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <SmallField label="Why this format" value={item.whyThisFormat || "-"} />
+                <SmallField label="Why this time" value={item.whyThisTime || "-"} />
+              </div>
+              {opportunity ? (
+                <>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <SmallField label="Identity pillar" value={pillarLabels[opportunity.identityPillar] || opportunity.identityPillar} />
+                    <SmallField label="Growth intent" value={opportunity.growthIntent.replaceAll("_", " ")} />
+                    <SmallField label="Strategy narrative" value={opportunity.strategyNarrativeKey.replaceAll("_", " ")} />
+                    <SmallField label="Topic cluster" value={opportunity.topicClusterKey.replaceAll("_", " ")} />
+                  </div>
+                  <SmallField label="Source signal" value={opportunity.sourceSummary || "-"} />
+                  <SmallField label="Thesis" value={opportunity.thesis || "-"} />
+                  <SmallField label="Why now" value={opportunity.whyNow || "-"} />
+                  <div className="grid grid-cols-3 gap-2">
+                    <DecisionScore label="Strategic fit" value={opportunity.strategicFit} />
+                    <DecisionScore label="Novelty" value={opportunity.novelty} />
+                    <DecisionScore label="Evidence" value={opportunity.evidenceStrength} />
+                  </div>
+                </>
+              ) : null}
+              {storyArc ? (
+                <div className="rounded-lg border border-white/5 bg-black/20 p-3">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/25">Story chapter</p>
+                  <p className="mt-1 font-bold text-white/65">{storyArc.title}</p>
+                  {storyArc.currentChapter ? <p className="mt-2 text-xs leading-5 text-white/40">{storyArc.currentChapter}</p> : null}
+                  {storyArc.currentTension ? <p className="mt-2 text-xs text-amber-200/65">Tension: {storyArc.currentTension}</p> : null}
+                  {storyArc.unresolvedQuestion ? <p className="mt-1 text-xs text-white/35">Open question: {storyArc.unresolvedQuestion}</p> : null}
+                  {storyArc.nextNarrativeOpportunity ? <p className="mt-2 text-xs text-[#C6FF32]/65">Next narrative move: {storyArc.nextNarrativeOpportunity}</p> : null}
+                </div>
+              ) : null}
+              {evidenceIds.length ? (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-white/25">Evidence used</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {evidenceIds.map((id) => (
+                      <span key={`why-${id}`} className="rounded-md border border-white/10 px-2 py-1 text-[10px] text-white/35">{id}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </details>
           <details className="rounded-lg border border-white/5 bg-white/[0.02] p-3 text-xs text-white/35">
             <summary className="cursor-pointer select-none font-bold text-white/45">
               HSAKAA details
@@ -1201,6 +1287,15 @@ function Execution({ item }: { item: MediaPlanningExecution }) {
         </div>
       ) : null}
     </article>
+  );
+}
+
+function DecisionScore({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-lg border border-white/5 bg-black/20 p-3 text-center">
+      <p className="text-[9px] font-black uppercase tracking-[0.1em] text-white/25">{label}</p>
+      <p className="mt-1 text-sm font-black text-[#C6FF32]">{Math.round(value || 0)}</p>
+    </div>
   );
 }
 

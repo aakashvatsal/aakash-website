@@ -1693,6 +1693,22 @@ export interface MediaPlanningStoryArc {
   title: string;
   purpose: string;
   narrative: string;
+  premise: string;
+  currentChapter: string;
+  currentTension: string;
+  unresolvedQuestion: string;
+  audienceKnows: string[];
+  audienceDoesNotKnowYet: string[];
+  nextNarrativeOpportunity: string;
+  status: "active" | "paused" | "completed";
+  strategyNarrativeKey: string;
+  topicClusterKey: string;
+  growthIntent:
+    | "authority"
+    | "discovery"
+    | "conversion"
+    | "affinity"
+    | "conversation";
   companyName?: string;
   durationDays: number;
   beats: Array<{
@@ -1732,12 +1748,23 @@ export interface MediaPlanningVideoPack {
   fullScript: string;
   targetDurationSeconds: number;
   deliveryInstructions: string;
+  shootStyle: string;
+  location: string;
+  movement: string;
+  openingFrame: string;
+  cameraPosition: string;
+  shotList: string[];
   cameraInstructions: string;
   punchIns: MediaPlanningTimedDirection[];
   broll: MediaPlanningTimedDirection[];
   onScreenText: MediaPlanningTimedDirection[];
+  audioDirection: string;
+  lightingDirection: string;
+  editingRhythm: string;
+  captionDirection: string;
   musicDirection: string;
   coverDirection: string;
+  coverFrame: string;
 }
 
 export interface MediaPlanningStoryFrame {
