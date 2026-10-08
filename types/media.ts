@@ -1825,6 +1825,24 @@ export interface MediaPlanningExecution {
   formatIntent: string;
   opportunityKey?: string;
   storyArcKey?: string;
+  seriesKey?: string;
+  seriesName?: string;
+  editorialFingerprint?: string;
+  editorialScore?: number;
+  editorialIssues?: string[];
+  editorialVersion?: string;
+  qualityScore?: number;
+  qualityVerdict?: 'pass' | 'revise' | 'evidence_needed';
+  qualityDimensions?: Record<string, number>;
+  qualityIssues?: string[];
+  qualityRevisionCount?: number;
+  storyBeats?: string[];
+  storyPayoff?: string;
+  trendStatus?: "verified" | "not_verified";
+  trendTitle?: string;
+  trendSource?: string;
+  trendUrl?: string;
+  trendPublishedAt?: string;
   reason: string;
   whyThisFormat: string;
   whyThisTime: string;
@@ -1955,11 +1973,46 @@ export interface MediaPlanningGenerationJob {
     calls: number;
     failedCalls: number;
     retriedCalls: number;
+    estimatedCostUsd?: number;
+    budgetLimited?: boolean;
+    estimatedInputTokens?: number;
   };
   partialPlan: MediaPlanningPartialPlan | null;
 }
 
+export type MediaCreatorQuotaCounts = {
+  instagramReels: number;
+  instagramCarousels: number;
+  youtubeLong: number;
+  youtubeShorts: number;
+  linkedin: number;
+  x: number;
+};
+
+export interface MediaCreatorQuotaResult {
+  minimums: MediaCreatorQuotaCounts;
+  totals: MediaCreatorQuotaCounts;
+  deficits: MediaCreatorQuotaCounts;
+  complete: boolean;
+}
+
 export interface MediaPlanningOverview {
+  creatorQuota?: {
+    rollingPlan: MediaCreatorQuotaResult;
+    rollingReadiness?: {
+      planned: MediaCreatorQuotaResult;
+      authored?: MediaCreatorQuotaResult;
+      ready: MediaCreatorQuotaResult;
+      unfinishedWritingPacks?: number;
+      draftsRequiringReview: number;
+      editorialHighQuality?: MediaCreatorQuotaResult;
+      independentlyPassed?: MediaCreatorQuotaResult;
+      independentlyBelowEight?: number;
+      editorialBelowEight?: number;
+    };
+    previousSevenDaysPublished: MediaCreatorQuotaResult & { startDate: string; endDate: string; count: number };
+    upcomingSevenDaysScheduled: MediaCreatorQuotaResult & { startDate: string; endDate: string; count: number };
+  };
   generatedAt: string;
   latest: MediaPlanningCycle | null;
   stalePlanDetected?: boolean;

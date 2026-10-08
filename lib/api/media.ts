@@ -1208,6 +1208,14 @@ export async function getLatestMediaPlanningGeneration() {
   >(response);
 }
 
+export async function improveMediaPlanningEditorial() {
+  return createMediaCoreResource<{
+    authored: number; editorialPass: number; stillNeedsReview: number;
+    improved: number; aiCalls: number; totalTokens: number;
+    estimatedCostUsd: number; budgetLimited: boolean;
+  }>("planning/improve-editorial", {});
+}
+
 export async function generateMediaPlanningCycle(payload?: {
   force?: boolean;
   startDate?: string;
@@ -1522,4 +1530,86 @@ export async function getMediaSocialPresenceOverviewClient() {
   return parseResponse<import("@/types/media").MediaSocialPresenceOverview>(
     response,
   );
+}
+
+
+export interface MediaSeriesOverview {
+  periodDays: number;
+  activeCount: number;
+  activeLimit: number;
+  untaggedPublished: number;
+  weeklyMinimums: Record<string, Record<string, number>>;
+  note: string;
+  groups: Array<{
+    key: string; name: string; status: 'active' | 'paused' | 'retired';
+    angle?: string; audience?: string; creativeKit?: Record<string, unknown>; channels: string[]; published: number; measured: number;
+    reviewStatus: 'insufficient_data' | 'review_ready'; rationale?: string | null;
+    byPlatform: Record<string, { posts: number; measured: number; impressions: number;
+      views: number; shares: number; saves: number; followersGained: number;
+      averageWatchPercentage: number | null }>;
+  }>;
+}
+export async function getMediaSeriesOverview(days = 90) {
+  const response = await fetch(`${API_URL}/media/core/series?days=${days}`, {
+    cache: 'no-store', headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<MediaSeriesOverview>(response);
+}
+export async function changeMediaSeriesStatus(key: string, status: 'active' | 'paused' | 'retired', rationale?: string) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/${encodeURIComponent(key)}/status`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, rationale }),
+  });
+  return parseResponse<{ key: string; status: string }>(response);
+}
+
+export type NewMediaSeriesPitch = { name: string; angle: string; channels: string[]; audience?: string };
+export type MediaSeriesDesign = {
+  score: number; verdict: 'strong' | 'refine' | 'weak'; strengths: string[];
+  risks: string[]; improvements: string[]; aiAssisted: boolean; warning?: string;
+  creativeKit: { premise: string; targetAudience: string; voice: string;
+    visualIdentity: string; episodeStructure: string[]; hookPatterns: string[];
+    episodeIdeas: string[]; productionGuidance: string; suggestedCadence: string };
+};
+export async function suggestMediaSeries(direction = '') {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/suggest`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({direction}),
+  });
+  return parseResponse<{pitch: NewMediaSeriesPitch; review: MediaSeriesDesign}>(response);
+}
+export async function designMediaSeries(pitch: NewMediaSeriesPitch) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/design`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pitch),
+  });
+  return parseResponse<MediaSeriesDesign>(response);
+}
+export async function createMediaSeries(pitch: NewMediaSeriesPitch & { design?: MediaSeriesDesign }) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/create`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pitch),
+  });
+  return parseResponse<{key: string; name: string; status: string}>(response);
+}
+
+export interface MediaSeriesRecommendation {
+  key: string; name: string; reviewStatus: string; engagementPerThousand: number | null;
+  measured: number; recommendation: string; note: string;
+  underperformingPlatforms?: string[]; comparablePlatforms?: number;
+}
+export async function getMediaSeriesRecommendations(days = 90) {
+  const response = await fetch(`${API_URL}/media/core/series/recommendations?days=${days}`, {
+    cache: 'no-store', headers: getAdminBackendHeaders(),
+  });
+  return parseResponse<MediaSeriesRecommendation[]>(response);
+}
+
+/** Run a conservative 56-day peer comparison, optionally activating an eligible replacement. */
+export async function reviewMediaSeries(apply = false) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/review`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apply }),
+  });
+  return parseResponse<{ applied: boolean; reason: string; proposed: { retire: string; activate: string } | null }>(response);
 }

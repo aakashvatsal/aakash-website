@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   getLatestMediaPlanningGeneration,
+  improveMediaPlanningEditorial,
   getMediaPlanningGeneration,
   startMediaPlanningGeneration,
 } from "@/lib/api/media";
@@ -63,6 +64,7 @@ export function MediaPlanningManager({
   onOverviewRefresh?: () => Promise<void> | void;
 }) {
   const [notes, setNotes] = useState("");
+  const [improvingEditorial, setImprovingEditorial] = useState(false);
   const [outingStatus, setOutingStatus] = useState<
     "yes" | "no" | "maybe" | "unknown"
   >(initialOverview.rolling?.weekContext?.outingStatus ?? "unknown");
@@ -111,7 +113,7 @@ export function MediaPlanningManager({
         if (next.status === "generated") {
           setError("");
           setRefreshingDate(null);
-          setMessage("HSAKAA completed the rolling execution-ready plan.");
+          setMessage("HSAKAA saved complete written content packs for the required formats. Filming, design, approval and publication are separate.");
           await onOverviewRefresh?.();
           return;
         }
@@ -192,6 +194,21 @@ export function MediaPlanningManager({
     });
   }
 
+  async function improveWeakWriting() {
+    setError("");
+    setMessage("");
+    setImprovingEditorial(true);
+    try {
+      const result = await improveMediaPlanningEditorial();
+      setMessage(`Independent quality review: ${result.editorialPass}/${result.authored} passes, ${result.improved} revised, ${result.stillNeedsReview} need real evidence or human editing. AI calls: ${result.aiCalls}; estimated $${result.estimatedCostUsd.toFixed(3)}.`);
+      await onOverviewRefresh?.();
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "Editorial improvement failed; existing plan was preserved.");
+    } finally {
+      setImprovingEditorial(false);
+    }
+  }
+
   async function refreshAllSevenDays() {
     if (!canGenerateWeek()) return;
     setRefreshingDate(null);
@@ -268,6 +285,12 @@ export function MediaPlanningManager({
               Advanced engines
             </Link>
             <Link
+              href="/admin/media/analytics"
+              className="rounded-xl border border-[#C6FF32]/20 px-3 py-2 text-xs font-bold text-[#C6FF32]"
+            >
+              Series + analytics + boost
+            </Link>
+            <Link
               href="/admin/media/plan/archive"
               className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-white/65"
             >
@@ -288,10 +311,8 @@ export function MediaPlanningManager({
             </h2>
             <p className="mt-2 text-sm leading-6 text-white/50">
               The week is designed for recognisability, authority and
-              familiarity-not content spam. Feed posts stay execution-ready,
-              while daily Instagram Stories use routine/current context as a
-              lightweight human-presence layer. Skips remain healthy when no
-              feed asset is needed.
+              familiarity-not content spam. Required slots are completed as scripts, captions and creative instructions even when AI is unavailable. Unverified details still require approval; nothing is automatically published. Daily Instagram Stories use routine/current context as
+              a lightweight human-presence layer.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -299,7 +320,9 @@ export function MediaPlanningManager({
               disabled={
                 isGenerating ||
                 !initialOverview.presenceReady ||
-                !initialOverview.rolling?.missingDates?.length
+                (!initialOverview.rolling?.missingDates?.length &&
+                  initialOverview.creatorQuota?.rollingReadiness?.authored?.complete !== false &&
+                  initialOverview.creatorQuota?.rollingPlan?.complete !== false)
               }
               onClick={generateMissingDays}
               className="rounded-xl bg-[#C6FF32] px-4 py-2.5 text-sm font-black text-black disabled:opacity-40"
@@ -309,17 +332,29 @@ export function MediaPlanningManager({
                 ? "Planning in background…"
                 : initialOverview.rolling?.missingDates?.length
                   ? `Generate ${initialOverview.rolling.missingDates.length} missing day${initialOverview.rolling.missingDates.length === 1 ? "" : "s"}`
-                  : "No missing days"}
+                  : initialOverview.creatorQuota?.rollingReadiness?.authored?.complete === false ||
+                    initialOverview.creatorQuota?.rollingPlan?.complete === false
+                    ? "Complete missing writing packs (no AI)"
+                    : "No missing days or quota gaps"}
             </button>
             <button
-              disabled={isGenerating || !initialOverview.presenceReady}
+              disabled={isGenerating || improvingEditorial || !plan}
+              onClick={improveWeakWriting}
+              className="rounded-xl border border-sky-400/35 bg-sky-400/[0.06] px-4 py-2.5 text-sm font-black text-sky-200 transition hover:bg-sky-400/10 disabled:opacity-40"
+              title="One bounded AI request repairs up to 3 evidence-backed drafts. No whole-week regeneration; cost is displayed afterwards."
+            >
+              <Sparkles className="mr-2 inline h-4 w-4" />
+              {improvingEditorial ? "Improving weak scripts…" : "Improve weak scripts · low-cost"}
+            </button>
+            <button
+              disabled={isGenerating || improvingEditorial || !initialOverview.presenceReady}
               onClick={refreshAllSevenDays}
               className="rounded-xl border border-[#C6FF32]/35 bg-[#C6FF32]/[0.06] px-4 py-2.5 text-sm font-black text-[#C6FF32] transition hover:bg-[#C6FF32]/10 disabled:opacity-40"
             >
               <RefreshCw
                 className={`mr-2 inline h-4 w-4 ${isGenerating ? "animate-spin" : ""}`}
               />
-              {isGenerating ? "Refreshing…" : "Refresh all 7 days"}
+              {isGenerating ? "Refreshing…" : "Regenerate week (uses AI credits)"}
             </button>
           </div>
         </div>
@@ -333,8 +368,27 @@ export function MediaPlanningManager({
               {initialOverview.rolling?.endDate ?? plan?.endDate ?? "-"}
             </p>
             <p className="mt-2 text-xs leading-5 text-white/40">
-              Fresh history starts 7 September 2026. Generate Missing keeps every existing day unchanged and creates only the missing date(s). Refresh all 7 days rebuilds the entire active window from the latest strategy, evidence and context. Previous plans remain available in Plan Archive.
+              Generate Missing fills missing dates and authors complete scripts, captions and slides for every required format, without rerunning the AI. Finished writing is not filmed, designed, approved or published. Regenerating the whole week uses AI credits. Previous plans remain available in Plan Archive.
             </p>
+            {initialOverview.creatorQuota?.rollingReadiness ? (
+              <div className="mt-3 flex flex-wrap gap-3 text-xs">
+                <span className="font-semibold text-[#C6FF32]">
+                  Written packages: {initialOverview.creatorQuota.rollingReadiness.authored?.complete ? "17/17 minimum met" : "Incomplete / run Generate Missing"}
+                </span>
+                <span className="text-white/50">
+                  Format-ready: {initialOverview.creatorQuota.rollingReadiness.ready?.complete ? "17/17 minimum met" : "Awaiting review"}
+                </span>
+                <span className="text-white/50">
+                  Editorial 8+/10: {initialOverview.creatorQuota.rollingReadiness.editorialHighQuality?.complete ? "17/17 structural preflight" : `${initialOverview.creatorQuota.rollingReadiness.editorialBelowEight ?? "—"} to improve`}
+                </span>
+                <span className={initialOverview.creatorQuota.rollingReadiness.independentlyPassed?.complete ? "font-semibold text-emerald-200" : "font-semibold text-amber-200"}>
+                  Independent 8.5+/10: {initialOverview.creatorQuota.rollingReadiness.independentlyPassed?.complete ? "17/17 editorial pass" : `${initialOverview.creatorQuota.rollingReadiness.independentlyBelowEight ?? "Not yet reviewed"} still need better stories or evidence`}
+                </span>
+                <span className="text-white/50">
+                  Unfinished writing packs: {initialOverview.creatorQuota.rollingReadiness.unfinishedWritingPacks ?? "—"}
+                </span>
+              </div>
+            ) : null}
             {initialOverview.rolling?.missingDates?.length ? (
               <p className="mt-2 text-[11px] text-amber-200/80">
                 Missing: {initialOverview.rolling.missingDates.join(", ")}
@@ -394,7 +448,7 @@ export function MediaPlanningManager({
                   {generationJob.status === "generating"
                     ? "HSAKAA is building the week without holding the browser connection open."
                     : generationJob.status === "generated"
-                      ? "Planning completed."
+                      ? "Plan saved · check publish-ready counts."
                       : "Planning failed."}
                 </p>
               </div>
@@ -410,7 +464,7 @@ export function MediaPlanningManager({
                 }}
               />
             </div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
               <JobStat
                 label="Days checkpointed"
                 value={`${generationJob.completedDays || 0} / ${generationJob.totalDays || 7}`}
@@ -426,6 +480,10 @@ export function MediaPlanningManager({
               <JobStat
                 label="Retries / failed calls"
                 value={`${generationJob.usage?.retriedCalls || 0} / ${generationJob.usage?.failedCalls || 0}`}
+              />
+              <JobStat
+                label="AI estimated cost"
+                value={`$${(generationJob.usage?.estimatedCostUsd || 0).toFixed(3)}`}
               />
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-white/25">
@@ -444,6 +502,7 @@ export function MediaPlanningManager({
                 {formatNumber(generationJob.usage?.reasoningTokens || 0)}
               </span>
             </div>
+            {generationJob.usage?.budgetLimited && <p className="mt-2 text-xs text-amber-200">AI budget reached; missing content writing packs are completed offline. Filming, design and any evidence review still remain.</p>}
             <p className="mt-2 text-xs leading-5 text-white/35">
               The request is persisted in the backend. Refreshing or leaving
               this page will not cancel generation. Completed days are
@@ -834,6 +893,16 @@ function CadenceSummary({
     ["WhatsApp", `${whatsapp} / ${cadence?.whatsappPresence ?? "strategy"}`],
   ];
 
+  const mandatoryMix = [
+    ["Instagram Reels", posts.filter(item => item.platform === "instagram" && item.format === "reel").length, 3],
+    ["Instagram carousels", posts.filter(item => item.platform === "instagram" && item.format === "carousel").length, 1],
+    ["YouTube long videos", posts.filter(item => item.platform === "youtube" && item.format === "video").length, 1],
+    ["YouTube Shorts", posts.filter(item => item.platform === "youtube" && item.format === "short").length, 3],
+    ["LinkedIn posts", linkedin, 5],
+    ["X posts", x, 4],
+  ] as const;
+  const mandatoryComplete = mandatoryMix.every(([, actual, min]) => actual >= min);
+
   const growth = policy.growthObjective;
   const narratives = safeArray(policy.strategyNarratives);
 
@@ -876,6 +945,20 @@ function CadenceSummary({
         </div>
       ) : null}
 
+      <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-4">
+        <p className="text-xs font-black uppercase tracking-[0.12em] text-white/70">
+          Mandatory 7-day publishing plan {mandatoryComplete ? "· fully planned" : "· missing formats"}
+        </p>
+        <p className="mt-1 text-xs text-white/40">These are generated-plan counts, not confirmation of published posts.</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {mandatoryMix.map(([label, actual, minimum]) => (
+            <div key={label} className="rounded-lg border border-white/10 p-3">
+              <span className="block text-xs text-white/50">{label}</span>
+              <strong className={actual >= minimum ? "text-[#C6FF32]" : "text-amber-300"}>{actual} / {minimum}</strong>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {items.map(([label, value]) => (
           <div
@@ -1162,12 +1245,28 @@ function Execution({
           <Clock3 className="h-3 w-3" /> {item.time}
         </span>
         <span>{item.format}</span>
+        {!isSkip && typeof item.editorialScore === 'number' && (
+          <span className={`rounded-full border px-2 py-0.5 ${item.editorialScore >= 8 ? 'border-emerald-400/30 text-emerald-200' : 'border-amber-400/30 text-amber-200'}`} title="Heuristic editorial preflight, not a prediction of watch time or skip rate">
+            Structure {item.editorialScore}/10 {item.editorialScore >= 8 ? '· schema pass' : '· needs rewrite'}
+          </span>
+        )}
+        {!isSkip && (
+          <span className={`rounded-full border px-2 py-0.5 ${item.qualityVerdict === 'pass' ? 'border-emerald-400/30 text-emerald-200' : 'border-amber-400/30 text-amber-200'}`}
+            title="Independent copy review. Estimated editorial quality, not observed watch time or skip rate.">
+            Independent {typeof item.qualityScore === 'number' ? `${item.qualityScore}/10` : 'not reviewed'} · {item.qualityVerdict === 'pass' ? 'editorial pass' : 'needs review'}
+          </span>
+        )}
+        {!isSkip && <span className="rounded-full border border-[#C6FF32]/25 px-2 py-0.5 text-[#C6FF32]">Series: {item.seriesName || (item.seriesKey ? item.seriesKey.replaceAll("-", " ") : "Unassigned · review")}</span>}
+        {!isSkip && (item.trendStatus === "verified" && item.trendUrl ? (
+          <a className="rounded-full border border-sky-400/20 px-2 py-0.5 text-sky-200 hover:underline" href={item.trendUrl} target="_blank" rel="noopener noreferrer" title={`${item.trendSource || "Trend"} · ${item.trendPublishedAt || ""}`}>Verified trend: {item.trendTitle}</a>
+        ) : <span className="text-white/30">Evergreen · no verified trend</span>)}
         <span>{item.estimatedMinutes} min</span>
       </div>
       <p className="mt-3 text-xs leading-5 text-white/45">{item.reason}</p>
 
       {!isSkip ? (
         <div className="mt-4 space-y-4 border-t border-white/5 pt-4">
+          {item.hook && <CopyField label="Opening hook · first 1–2 seconds" value={item.hook} />}
           {!xThread.length && !whatsappSequence.length ? (
             <CopyField label={publishLabel} value={publishCopy} primary />
           ) : null}
@@ -1189,6 +1288,36 @@ function Execution({
             />
           ) : null}
 
+          <div className="rounded-xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C6FF32]">48h / 96h learning loop</p>
+              <p className="mt-1 text-xs leading-5 text-white/55">After this publishes, add native metrics at 48h and 96h. HSAKAA uses those checkpoints for boost / wait / do-not-boost, pin decisions, retention learning and future series allocation.</p>
+            </div>
+            <Link href="/admin/media/analytics" className="mt-3 inline-flex shrink-0 rounded-lg border border-[#C6FF32]/25 px-3 py-2 text-xs font-black text-[#C6FF32] sm:mt-0">Open analytics</Link>
+          </div>
+
+          {item.storyBeats?.length ? (
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <p className="text-[11px] font-semibold text-white/75">Story progression</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-white/65">
+                {item.storyBeats.map((beat, i) => <li key={`${i}-${beat}`}>{beat}</li>)}
+              </ol>
+              {item.storyPayoff ? <p className="mt-2 text-xs text-[#C6FF32]">Payoff: {item.storyPayoff}</p> : null}
+            </div>
+          ) : null}
+          {item.qualityDimensions && (
+            <details className="rounded-xl border border-white/10 bg-black/20 p-3 text-xs text-white/60">
+              <summary className="cursor-pointer font-semibold text-white/80">Independent editorial rubric · {item.qualityRevisionCount ?? 0} targeted revisions</summary>
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {Object.entries(item.qualityDimensions).map(([name, value]) =>
+                  <span key={name}>{name.replace(/([A-Z])/g, ' $1')}: <b className="text-white/80">{Number(value).toFixed(1)}/10</b></span>)}
+              </div>
+              {!!item.qualityIssues?.length && <p className="mt-2 text-amber-200/80">Improve: {item.qualityIssues.join(' · ')}</p>}
+            </details>
+          )}
+          {item.editorialIssues?.length ? (
+            <p className="text-xs text-amber-200/70">Editorial review: {item.editorialIssues.join(' · ')}</p>
+          ) : null}
           {item.pinnedComment ? (
             <CopyField label="Pinned comment" value={item.pinnedComment} />
           ) : null}
@@ -1390,12 +1519,32 @@ function VideoPack({
       </div>
       <CopyField label="Word-for-word script" value={pack.fullScript} primary />
       <CopyField label="Delivery" value={pack.deliveryInstructions} />
+      <CopyField label="Shoot style" value={pack.shootStyle} />
+      <CopyField label="Location" value={pack.location} />
+      <CopyField label="Opening frame" value={pack.openingFrame} />
       <CopyField label="Camera" value={pack.cameraInstructions} />
+      {safeArray(pack.shotList).length ? (
+        <div className="mt-3 rounded-lg border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-3">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C6FF32]">Shot-by-shot blueprint</p>
+          <div className="mt-2 space-y-2">
+            {safeArray(pack.shotList).map((shot, index) => (
+              <p key={`${index}-${shot}`} className="text-xs leading-5 text-white/65"><span className="mr-2 font-black text-white/30">{index + 1}.</span>{shot}</p>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <TimedDirections label="Punch-ins" values={pack.punchIns} />
       <TimedDirections label="B-roll" values={pack.broll} />
       <TimedDirections label="On-screen text" values={pack.onScreenText} />
       <CopyField label="Music direction" value={pack.musicDirection} />
       <CopyField label="Cover direction" value={pack.coverDirection} />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.025] p-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">After publishing</p>
+          <p className="mt-1 text-xs text-white/60">Enter native metrics at 48h and 96h. HSAKAA uses them for boost / wait / do-not-boost, pin decisions, retention learning and future series allocation.</p>
+        </div>
+        <Link href="/admin/media/analytics" className="rounded-lg border border-[#C6FF32]/20 px-3 py-2 text-xs font-black text-[#C6FF32]">Open 48h/96h analytics</Link>
+      </div>
     </div>
   );
 }

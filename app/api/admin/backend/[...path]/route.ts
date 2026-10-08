@@ -165,7 +165,8 @@ async function proxyRequest(
   // The browser cookie is verified here and never forwarded directly.
   // Private HSAKAA receives only the already-verified signed session token
   // through this server-to-server header.
-  if (path[0] === "hsakaa" && path[1] === "private") {
+  if ((path[0] === "hsakaa" && path[1] === "private") ||
+      (path[0] === "media" && path[1] === "core" && path[2] === "series")) {
     headers.set("x-owner-session", token);
   }
 
