@@ -7,6 +7,7 @@ import {
   ADMIN_SESSION_COOKIE,
   verifyAdminSessionToken,
 } from "@/lib/admin-auth.server";
+import { requiresVerifiedOwnerSession } from "@/lib/admin-backend-owner-routes";
 
 export const maxDuration = 600;
 
@@ -165,8 +166,9 @@ async function proxyRequest(
   // The browser cookie is verified here and never forwarded directly.
   // Private HSAKAA receives only the already-verified signed session token
   // through this server-to-server header.
-  if ((path[0] === "hsakaa" && path[1] === "private") ||
-      (path[0] === "media" && path[1] === "core" && path[2] === "series")) {
+  // The admin cookie was verified above. Only trusted owner-protected
+  // destinations receive the session, via a server-to-server header.
+  if (requiresVerifiedOwnerSession(path)) {
     headers.set("x-owner-session", token);
   }
 

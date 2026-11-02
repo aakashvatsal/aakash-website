@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
 import {
   changeMediaSeriesStatus,
@@ -8,6 +9,9 @@ import {
   suggestMediaSeries,
   createMediaSeries,
   reviewMediaSeries,
+  updateMediaSeries,
+  removeMediaSeries,
+  MEDIA_SERIES_SOURCE_TOPICS,
   type MediaSeriesDesign,
   type NewMediaSeriesPitch,
   type MediaSeriesOverview,
@@ -50,11 +54,36 @@ export function MediaSeriesAnalytics({ data, recommendations = [], quota }: {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string>("");
-  const [newSeries, setNewSeries] = useState<NewMediaSeriesPitch>({name: '', angle: '', channels: ['instagram','youtube'], audience: ''});
+  const [newSeries, setNewSeries] = useState<NewMediaSeriesPitch>({name: '', angle: '', channels: ['instagram','youtube'], audience: '', sourceTopics: [], topicKeywords: [], creativeDirection: ''});
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newDesign, setNewDesign] = useState<MediaSeriesDesign | null>(null);
   const [showCreator, setShowCreator] = useState(false);
   const fmt = (n: number) => new Intl.NumberFormat("en-IN").format(n);
 
+  function resetEditor() {
+    setEditingKey(null);
+    setNewDesign(null);
+    setShowCreator(false);
+    setNewSeries({name:'', angle:'', audience:'', channels:['instagram','youtube'], sourceTopics:[], topicKeywords:[], creativeDirection:''});
+  }
+  function editSeries(series: Series) {
+    setNewSeries({ name:series.name, angle:series.angle || '', audience:series.audience || '',
+      channels:[...series.channels], sourceTopics:[...(series.sourceTopics ?? [])],
+      topicKeywords:[...(series.topicKeywords ?? [])], creativeDirection:series.creativeDirection || '' });
+    setEditingKey(series.key);
+    setNewDesign(null);
+    setShowCreator(true);
+    setFeedback('');
+    // The form is above the cards; make it discoverable after edit is clicked.
+    window.requestAnimationFrame(() => document.getElementById('media-series-editor')?.scrollIntoView({behavior:'smooth', block:'start'}));
+  }
+  async function removeSeries(series: Series) {
+    if (!window.confirm(`Remove “${series.name}” from new content plans? Published history will be preserved. This cannot be undone from the interface.`)) return;
+    setBusy(series.key); setFeedback('');
+    try { await removeMediaSeries(series.key); setFeedback(`${series.name} removed from the active portfolio. Generate a fresh week to use your changes.`); router.refresh(); }
+    catch(error) { setFeedback(error instanceof Error ? error.message : 'Could not remove series'); }
+    finally { setBusy(null); }
+  }
   async function suggestNewSeries() {
     setBusy('suggest'); setFeedback(''); setNewDesign(null);
     try { const suggestion = await suggestMediaSeries(newSeries.angle);
@@ -71,10 +100,13 @@ export function MediaSeriesAnalytics({ data, recommendations = [], quota }: {
   async function saveNewSeries() {
     setBusy('create'); setFeedback('');
     try {
-      const saved = await createMediaSeries({ ...newSeries, design: newDesign ?? undefined });
-      setFeedback(`${saved.name} saved as PAUSED. Activate after pausing an existing series if all six slots are occupied.`);
-      setNewSeries({name:'',angle:'',audience:'',channels:['instagram','youtube']});
-      setNewDesign(null); setShowCreator(false); router.refresh();
+      const saved = editingKey
+        ? await updateMediaSeries(editingKey, newSeries)
+        : await createMediaSeries({ ...newSeries, design: newDesign ?? undefined });
+      setFeedback(editingKey
+        ? `${saved.name} updated. Regenerate the Media week to use the new series brief; scheduled and published assets remain unchanged.`
+        : `${saved.name} saved as PAUSED. Activate it to include it in the next generated plan.`);
+      resetEditor(); router.refresh();
     } catch (error) { setFeedback(error instanceof Error ? error.message : 'Could not create series'); }
     finally { setBusy(null); }
   }
@@ -94,10 +126,10 @@ export function MediaSeriesAnalytics({ data, recommendations = [], quota }: {
   async function runReview() {
     setBusy("review"); setFeedback("");
     try {
-      const result = await reviewMediaSeries(true);
+      const result = await reviewMediaSeries(false);
       setFeedback(result.applied && result.proposed
-        ? `Retired ${result.proposed.retire} and activated ${result.proposed.activate}.`
-        : result.reason);
+        ? `Suggestion: pause ${result.proposed.retire} and activate ${result.proposed.activate} if you agree.`
+        : result.proposed ? `Suggested rotation: ${result.proposed.retire} → ${result.proposed.activate}. Make changes yourself using Pause / Activate.` : result.reason);
       router.refresh();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Series review failed");
@@ -110,19 +142,40 @@ export function MediaSeriesAnalytics({ data, recommendations = [], quota }: {
         <p className="text-sm text-muted-foreground">{data.activeCount} / {data.activeLimit} active series · {data.periodDays}-day window · {data.untaggedPublished} untagged published items</p>
       </div>
       <div className="flex gap-2 flex-wrap">
-        <button type="button" onClick={() => setShowCreator(v => !v)} className="rounded-lg border px-3 py-2 text-sm">{showCreator ? 'Close series creator' : 'New series + AI review'}</button>
-        <button type="button" disabled={busy !== null} onClick={runReview} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Run evidence-based review</button>
+        <button type="button" onClick={() => { if (showCreator && !editingKey) resetEditor(); else { resetEditor(); setShowCreator(true); } }} className="rounded-lg border px-3 py-2 text-sm">{showCreator && !editingKey ? 'Close creator' : 'Create a new series'}</button>
+        <button type="button" disabled={busy !== null} onClick={runReview} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50">Preview performance review</button>
       </div>
     </div>
-    {feedback && <p role="status" className="text-sm">{feedback}</p>}
-    {showCreator && <div className="rounded-xl border p-4 space-y-4 max-w-3xl">
-      <div><h3 className="text-lg font-semibold">Create and design a recurring series</h3><p className="text-sm text-muted-foreground">Evaluate before adding. Saving keeps the series paused, and AI review is a single optional low-cost call. Nothing is activated or published automatically.</p></div>
+    {feedback && <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm"><span>{feedback}</span><Link href="/admin/media/plan" className="font-semibold underline underline-offset-4">Open Media Plan → Regenerate week</Link></div>}
+    <p className="text-sm text-muted-foreground">You control the series HSAKAA writes next: create, edit, pause, activate or remove. Choose the source topics (hobbies, books, founder work, daily life and more), then regenerate the Media week. Personal data is never publication consent.</p>
+    {showCreator && <div id="media-series-editor" className="rounded-xl border p-4 space-y-4 max-w-3xl scroll-mt-24">
+      <div><h3 className="text-lg font-semibold">{editingKey ? `Edit ${newSeries.name}` : 'Create and design a recurring series'}</h3><p className="text-sm text-muted-foreground">Give HSAKAA a precise story promise, the life areas it may consider and specific keywords. New series start paused. Editing keeps the existing activation status. Historical posts stay untouched.</p></div>
       <label className="block text-sm space-y-1"><span className="font-medium">Series name</span><input className="w-full rounded-md border bg-transparent p-2" maxLength={70} value={newSeries.name} onChange={e=>{setNewSeries(v=>({...v,name:e.target.value}));setNewDesign(null);}} placeholder="e.g. Aakash Tries Everything" /></label>
       <label className="block text-sm space-y-1"><span className="font-medium">Recurring premise and what makes it different</span><textarea className="w-full rounded-md border bg-transparent p-2" maxLength={500} rows={3} value={newSeries.angle} onChange={e=>{setNewSeries(v=>({...v,angle:e.target.value}));setNewDesign(null);}} placeholder="One repeatable real-life format, stakes, voice, and why a viewer would return" /></label>
       <label className="block text-sm space-y-1"><span className="font-medium">Audience (optional)</span><input className="w-full rounded-md border bg-transparent p-2" value={newSeries.audience || ''} onChange={e=>setNewSeries(v=>({...v,audience:e.target.value}))} maxLength={150}/></label>
       <fieldset className="space-y-1"><legend className="text-sm font-medium">Platforms</legend><div className="flex flex-wrap gap-3">{['instagram','youtube','linkedin','x'].map(channel=><label key={channel} className="flex items-center gap-1.5 text-sm capitalize"><input type="checkbox" checked={newSeries.channels.includes(channel)} onChange={e=>{setNewSeries(v=>({...v,channels:e.target.checked?[...v.channels,channel]:v.channels.filter(x=>x!==channel)}));setNewDesign(null)}} />{channel}</label>)}</div></fieldset>
-      <button type="button" disabled={busy !== null} onClick={suggestNewSeries} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-40">{busy === 'suggest' ? 'Suggesting…' : 'Suggest a new series for me'}</button>
-      <button type="button" disabled={busy !== null || newSeries.name.trim().length < 4 || newSeries.angle.trim().length < 25 || !newSeries.channels.length} onClick={reviewNewSeries} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-40">{busy === 'design' ? 'Reviewing…' : 'Ask AI to review & design'}</button>
+      <fieldset className="space-y-2"><legend className="text-sm font-semibold">Where should HSAKAA find story ideas?</legend>
+        <p className="text-xs text-muted-foreground">These are discovery hints, not automatic permission to quote private records. Hobbies and connected personal context must have real evidence.</p>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{MEDIA_SERIES_SOURCE_TOPICS.map(topic =>
+          <label key={topic.key} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+            <input type="checkbox" checked={(newSeries.sourceTopics ?? []).includes(topic.key)}
+              onChange={e => {setNewSeries(old => ({...old, sourceTopics:e.target.checked ? [...(old.sourceTopics ?? []), topic.key] : (old.sourceTopics ?? []).filter(key => key !== topic.key)}));setNewDesign(null);}} />{topic.label}
+          </label>)}</div>
+      </fieldset>
+      <label className="block text-sm space-y-1"><span className="font-medium">Specific keywords / skills (comma separated)</span>
+        <input className="w-full rounded-md border bg-transparent p-2" value={(newSeries.topicKeywords ?? []).join(', ')}
+          onChange={e => setNewSeries(old => ({...old,topicKeywords:e.target.value.split(',').map(x=>x.trim()).filter(Boolean).slice(0,20)}))}
+          placeholder="guitar, chess, Spanish, books, Afghanistan" />
+        <span className="block text-xs text-muted-foreground">Use exact topics to help match newly generated scripts to this series. Up to 20.</span>
+      </label>
+      <label className="block text-sm space-y-1"><span className="font-medium">Creative direction (optional)</span>
+        <textarea className="w-full rounded-md border bg-transparent p-2" maxLength={750} rows={3} value={newSeries.creativeDirection || ''}
+          onChange={e=>setNewSeries(old=>({...old,creativeDirection:e.target.value}))}
+          placeholder="Opening hooks, on-camera storytelling, filming energy, episode shape, tone, visual cues, and what the series must avoid" />
+      </label>
+      {editingKey && <p className="rounded-lg border px-3 py-2 text-xs text-muted-foreground">Series identity key remains unchanged so old analytics and published content stay connected.</p>}
+      <button type="button" disabled={busy !== null || !!editingKey} onClick={suggestNewSeries} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-40">{busy === 'suggest' ? 'Suggesting…' : 'Suggest a new series for me'}</button>
+      <button type="button" disabled={busy !== null || !!editingKey || newSeries.name.trim().length < 4 || newSeries.angle.trim().length < 25 || !newSeries.channels.length} onClick={reviewNewSeries} className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-40">{busy === 'design' ? 'Reviewing…' : 'Ask AI to review & design'}</button>
       {newDesign && <div className="rounded-lg border p-4 space-y-3 text-sm">
         <div className="font-semibold">Editorial concept score: {newDesign.score}/10 · {newDesign.verdict.toUpperCase()} · {newDesign.aiAssisted ? 'AI-assisted' : 'Offline review'}</div>
         {newDesign.warning && <p className="text-amber-600">{newDesign.warning}</p>}
@@ -135,14 +188,22 @@ export function MediaSeriesAnalytics({ data, recommendations = [], quota }: {
         <div><strong>Episode concepts</strong><ul className="list-disc pl-5">{newDesign.creativeKit.episodeIdeas.map((idea,i)=><li key={i}>{idea}</li>)}</ul></div>
         <div><strong>What to improve</strong><ul className="list-disc pl-5">{newDesign.improvements.map((text,i)=><li key={i}>{text}</li>)}</ul></div>
         <div><strong>Risks</strong><ul className="list-disc pl-5">{newDesign.risks.map((text,i)=><li key={i}>{text}</li>)}</ul></div>
-        <button type="button" disabled={busy !== null} onClick={saveNewSeries} className="rounded-lg border px-3 py-2 font-medium disabled:opacity-40">Save as paused series</button>
+        {!editingKey && <button type="button" disabled={busy !== null} onClick={saveNewSeries} className="rounded-lg border px-3 py-2 font-medium disabled:opacity-40">Save as paused series</button>}
       </div>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy !== null || newSeries.name.trim().length < 4 || newSeries.angle.trim().length < 25 || !newSeries.channels.length}
+          onClick={saveNewSeries} className="rounded-lg bg-foreground px-4 py-2 text-sm font-bold text-background disabled:opacity-40">{busy === 'create' ? 'Saving…' : editingKey ? 'Save series changes' : 'Save new series'}</button>
+        <button type="button" onClick={resetEditor} className="rounded-lg border px-3 py-2 text-sm">Cancel</button>
+      </div>
     </div>}
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{data.groups.map((series: Series) => {
       const recommendation = recommendations.find(r => r.key === series.key);
       return <article key={series.key} className="rounded-xl border p-4 space-y-3">
         <div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{series.name}</h3><span className="text-xs uppercase opacity-65">{series.status}</span></div>
         <p className="text-xs text-muted-foreground">{series.angle}</p>
+        {!!series.sourceTopics?.length && <div className="flex flex-wrap gap-1">{series.sourceTopics.map(topic => <span key={topic} className="rounded-full border px-2 py-0.5 text-[11px] opacity-70">{MEDIA_SERIES_SOURCE_TOPICS.find(item => item.key === topic)?.label || topic}</span>)}</div>}
+        {!!series.topicKeywords?.length && <p className="text-xs opacity-70"><strong>Topics:</strong> {series.topicKeywords.join(', ')}</p>}
+        {!!series.creativeDirection && <p className="text-xs opacity-70"><strong>Direction:</strong> {series.creativeDirection}</p>}
         {series.creativeKit && typeof series.creativeKit.visualIdentity === 'string' && <p className="text-xs opacity-70"><strong>Creative identity:</strong> {series.creativeKit.visualIdentity}</p>}
         {recommendation && <div className="rounded-lg border px-3 py-2 text-xs space-y-1">
           <strong>{recommendation.recommendation === "consider_rotation" ? "Rotation candidate" : recommendation.recommendation === "keep" ? "Performing / retain" : "Collect more data"}</strong>
@@ -152,7 +213,9 @@ export function MediaSeriesAnalytics({ data, recommendations = [], quota }: {
         <div className="grid grid-cols-3 gap-2 text-center"><div><strong className="block text-lg">{fmt(series.published)}</strong><span className="text-xs">Published</span></div><div><strong className="block text-lg">{fmt(series.measured)}</strong><span className="text-xs">Measured</span></div><div><strong className="block text-sm">{series.reviewStatus === "review_ready" ? "Review" : "Learning"}</strong><span className="text-xs">Signal</span></div></div>
         <div className="flex flex-wrap gap-3 items-center">
           <button type="button" onClick={() => setExpanded(expanded === series.key ? null : series.key)} className="text-sm underline underline-offset-4">{expanded === series.key ? "Hide" : "Show"} channels</button>
+          <button type="button" disabled={busy !== null} onClick={() => editSeries(series)} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Edit</button>
           {series.status !== "retired" && <button type="button" disabled={busy !== null || (series.status === "paused" && data.activeCount >= data.activeLimit)} onClick={() => changeStatus(series)} className="rounded border px-2 py-1 text-xs disabled:opacity-40">{series.status === "active" ? "Pause" : "Activate"}</button>}
+          <button type="button" disabled={busy !== null} onClick={() => removeSeries(series)} className="rounded border border-red-400/30 px-2 py-1 text-xs text-red-500 disabled:opacity-40">Remove</button>
         </div>
         {expanded === series.key && <div className="space-y-2 text-xs">{Object.entries(series.byPlatform).length === 0 ? <p>No tagged published posts in this period.</p> : Object.entries(series.byPlatform).map(([platform, m]) => <div key={platform} className="rounded-lg border p-2">
           <div className="font-semibold capitalize">{platform}: {m.posts} posts / {m.measured} measured</div>

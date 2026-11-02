@@ -1836,6 +1836,11 @@ export interface MediaPlanningExecution {
   qualityDimensions?: Record<string, number>;
   qualityIssues?: string[];
   qualityRevisionCount?: number;
+  hookAlternatives?: string[];
+  openingVisual?: string;
+  storyTension?: string;
+  storyTurn?: string;
+  viewerPayoff?: string;
   storyBeats?: string[];
   storyPayoff?: string;
   trendStatus?: "verified" | "not_verified";

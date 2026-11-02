@@ -187,7 +187,8 @@ export function MediaPlanningManager({
     if (!canGenerateWeek()) return;
     await startGeneration({
       force: false,
-      mode: "roll",
+      // Ensure handles both an existing rolling base and a fresh window.
+      mode: "ensure",
       notes: notes.trim() ? notes : undefined,
       outingStatus,
       outingDetails,
@@ -288,7 +289,7 @@ export function MediaPlanningManager({
               href="/admin/media/analytics"
               className="rounded-xl border border-[#C6FF32]/20 px-3 py-2 text-xs font-bold text-[#C6FF32]"
             >
-              Series + analytics + boost
+              Manage series + AI suggestions
             </Link>
             <Link
               href="/admin/media/plan/archive"
@@ -330,6 +331,8 @@ export function MediaPlanningManager({
               <Sparkles className="mr-2 inline h-4 w-4" />
               {isGenerating
                 ? "Planning in background…"
+                : initialOverview.rolling?.freshStartRequired
+                  ? "Create rolling 7-day plan (AI budget applies)"
                 : initialOverview.rolling?.missingDates?.length
                   ? `Generate ${initialOverview.rolling.missingDates.length} missing day${initialOverview.rolling.missingDates.length === 1 ? "" : "s"}`
                   : initialOverview.creatorQuota?.rollingReadiness?.authored?.complete === false ||
@@ -368,7 +371,7 @@ export function MediaPlanningManager({
               {initialOverview.rolling?.endDate ?? plan?.endDate ?? "-"}
             </p>
             <p className="mt-2 text-xs leading-5 text-white/40">
-              Generate Missing fills missing dates and authors complete scripts, captions and slides for every required format, without rerunning the AI. Finished writing is not filmed, designed, approved or published. Regenerating the whole week uses AI credits. Previous plans remain available in Plan Archive.
+              Generate Missing preserves existing rolling content and repairs missing dates or formats without a full-week AI rerun. If there is no active plan for this window, it automatically creates one using the configured AI budget. Finished writing is not filmed, designed, approved or published. Regenerating the whole week also uses AI credits. Previous plans remain available in Plan Archive.
             </p>
             {initialOverview.creatorQuota?.rollingReadiness ? (
               <div className="mt-3 flex flex-wrap gap-3 text-xs">
@@ -1172,6 +1175,7 @@ function Execution({
   storyArc?: MediaPlanningStoryArc;
 }) {
   const isSkip = item.action === "skip";
+  const isUnwritten = item.editorialVersion === "offline-research-v2" || /Deterministic offline editorial completion|Offline research only/i.test(item.reason || "");
   const readinessIssues = safeArray(item.readinessIssues);
   const hashtags = safeArray(item.hashtags);
   const carouselSlides = safeArray(item.carouselSlides);
@@ -1245,12 +1249,12 @@ function Execution({
           <Clock3 className="h-3 w-3" /> {item.time}
         </span>
         <span>{item.format}</span>
-        {!isSkip && typeof item.editorialScore === 'number' && (
+        {!isSkip && !isUnwritten && typeof item.editorialScore === 'number' && (
           <span className={`rounded-full border px-2 py-0.5 ${item.editorialScore >= 8 ? 'border-emerald-400/30 text-emerald-200' : 'border-amber-400/30 text-amber-200'}`} title="Heuristic editorial preflight, not a prediction of watch time or skip rate">
             Structure {item.editorialScore}/10 {item.editorialScore >= 8 ? '· schema pass' : '· needs rewrite'}
           </span>
         )}
-        {!isSkip && (
+        {!isSkip && !isUnwritten && (
           <span className={`rounded-full border px-2 py-0.5 ${item.qualityVerdict === 'pass' ? 'border-emerald-400/30 text-emerald-200' : 'border-amber-400/30 text-amber-200'}`}
             title="Independent copy review. Estimated editorial quality, not observed watch time or skip rate.">
             Independent {typeof item.qualityScore === 'number' ? `${item.qualityScore}/10` : 'not reviewed'} · {item.qualityVerdict === 'pass' ? 'editorial pass' : 'needs review'}
@@ -1264,9 +1268,60 @@ function Execution({
       </div>
       <p className="mt-3 text-xs leading-5 text-white/45">{item.reason}</p>
 
-      {!isSkip ? (
+      {!isSkip && isUnwritten ? (
+        <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-400/[0.08] p-4">
+          <p className="text-sm font-bold text-amber-200">This is a story research slot, not a finished post.</p>
+          <p className="mt-2 text-xs leading-5 text-white/75">
+            The AI writer did not produce an evidence-grounded story. No hook, script, caption, filming timeline or editorial score is being claimed.
+          </p>
+          <p className="mt-3 text-xs font-semibold text-white/80">What needs to be captured</p>
+          <p className="mt-1 text-xs leading-5 text-white/65">
+            {item.editorialVersion === "offline-research-v2"
+              ? item.productionNotes
+              : "This older canned script has been retired. Record an actual specific moment or source and regenerate this day with AI before production."}
+          </p>
+          <p className="mt-3 text-xs text-amber-200/80">Not approved for filming, scheduling or publication.</p>
+        </div>
+      ) : !isSkip ? (
         <div className="mt-4 space-y-4 border-t border-white/5 pt-4">
-          {item.hook && <CopyField label="Opening hook · first 1–2 seconds" value={item.hook} />}
+          {item.hook && (
+            <div className="overflow-hidden rounded-2xl border border-[#C6FF32]/25 bg-gradient-to-br from-[#C6FF32]/12 via-black/40 to-sky-400/5 p-4">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#C6FF32]">Hook Studio · Selected opening</p>
+              <p className="text-lg font-semibold leading-snug text-white">“{item.hook}”</p>
+              {item.openingVisual && <p className="mt-2 text-xs leading-relaxed text-white/65"><span className="font-semibold text-sky-200">First frame:</span> {item.openingVisual}</p>}
+              {!!item.hookAlternatives?.length && (
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/45">Alternative hook angles · use only after matching the first spoken line</p>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {item.hookAlternatives.map((line, index) => (
+                      <div key={`${index}-${line}`} className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+                        <span className="text-[10px] font-bold text-[#C6FF32]">OPTION {index + 2}</span>
+                        <p className="mt-1 text-xs leading-relaxed text-white/85">{line}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="mt-3 text-[10px] text-white/40">Editorial estimates are not guaranteed views, virality or watch time.</p>
+            </div>
+          )}
+          {(item.storyTension || item.storyTurn || item.viewerPayoff) && (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/55">Narrative director · actual story progression</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ['01 · Stakes', item.storyTension],
+                  ['02 · Turn', item.storyTurn],
+                  ['03 · Payoff', item.viewerPayoff],
+                ].filter(([, value]) => Boolean(value)).map(([title, value]) => (
+                  <div key={title} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                    <p className="mb-1 text-[10px] font-bold uppercase text-[#C6FF32]">{title}</p>
+                    <p className="text-xs leading-relaxed text-white/80">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {!xThread.length && !whatsappSequence.length ? (
             <CopyField label={publishLabel} value={publishCopy} primary />
           ) : null}
@@ -1287,14 +1342,6 @@ function Execution({
               values={whatsappSequence}
             />
           ) : null}
-
-          <div className="rounded-xl border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-3 sm:flex sm:items-center sm:justify-between sm:gap-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C6FF32]">48h / 96h learning loop</p>
-              <p className="mt-1 text-xs leading-5 text-white/55">After this publishes, add native metrics at 48h and 96h. HSAKAA uses those checkpoints for boost / wait / do-not-boost, pin decisions, retention learning and future series allocation.</p>
-            </div>
-            <Link href="/admin/media/analytics" className="mt-3 inline-flex shrink-0 rounded-lg border border-[#C6FF32]/25 px-3 py-2 text-xs font-black text-[#C6FF32] sm:mt-0">Open analytics</Link>
-          </div>
 
           {item.storyBeats?.length ? (
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">
@@ -1519,32 +1566,12 @@ function VideoPack({
       </div>
       <CopyField label="Word-for-word script" value={pack.fullScript} primary />
       <CopyField label="Delivery" value={pack.deliveryInstructions} />
-      <CopyField label="Shoot style" value={pack.shootStyle} />
-      <CopyField label="Location" value={pack.location} />
-      <CopyField label="Opening frame" value={pack.openingFrame} />
       <CopyField label="Camera" value={pack.cameraInstructions} />
-      {safeArray(pack.shotList).length ? (
-        <div className="mt-3 rounded-lg border border-[#C6FF32]/15 bg-[#C6FF32]/[0.025] p-3">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#C6FF32]">Shot-by-shot blueprint</p>
-          <div className="mt-2 space-y-2">
-            {safeArray(pack.shotList).map((shot, index) => (
-              <p key={`${index}-${shot}`} className="text-xs leading-5 text-white/65"><span className="mr-2 font-black text-white/30">{index + 1}.</span>{shot}</p>
-            ))}
-          </div>
-        </div>
-      ) : null}
       <TimedDirections label="Punch-ins" values={pack.punchIns} />
       <TimedDirections label="B-roll" values={pack.broll} />
       <TimedDirections label="On-screen text" values={pack.onScreenText} />
       <CopyField label="Music direction" value={pack.musicDirection} />
       <CopyField label="Cover direction" value={pack.coverDirection} />
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.025] p-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-white/35">After publishing</p>
-          <p className="mt-1 text-xs text-white/60">Enter native metrics at 48h and 96h. HSAKAA uses them for boost / wait / do-not-boost, pin decisions, retention learning and future series allocation.</p>
-        </div>
-        <Link href="/admin/media/analytics" className="rounded-lg border border-[#C6FF32]/20 px-3 py-2 text-xs font-black text-[#C6FF32]">Open 48h/96h analytics</Link>
-      </div>
     </div>
   );
 }

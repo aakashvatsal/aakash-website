@@ -147,3 +147,14 @@ summary::-webkit-details-marker {
     animation: none;
   }
 }
+/* Keep admin navigation scrollable without a bright native scrollbar. */
+.admin-nav-scroll {
+  scrollbar-width: none; /* Firefox and modern Chromium */
+  -ms-overflow-style: none; /* Legacy Edge/IE */
+}
+
+.admin-nav-scroll::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+  width: 0;
+  height: 0;
+}

@@ -1542,7 +1542,9 @@ export interface MediaSeriesOverview {
   note: string;
   groups: Array<{
     key: string; name: string; status: 'active' | 'paused' | 'retired';
-    angle?: string; audience?: string; creativeKit?: Record<string, unknown>; channels: string[]; published: number; measured: number;
+    angle?: string; audience?: string; creativeKit?: Record<string, unknown>;
+    sourceTopics?: string[]; topicKeywords?: string[]; creativeDirection?: string;
+    channels: string[]; published: number; measured: number;
     reviewStatus: 'insufficient_data' | 'review_ready'; rationale?: string | null;
     byPlatform: Record<string, { posts: number; measured: number; impressions: number;
       views: number; shares: number; saves: number; followersGained: number;
@@ -1563,7 +1565,24 @@ export async function changeMediaSeriesStatus(key: string, status: 'active' | 'p
   return parseResponse<{ key: string; status: string }>(response);
 }
 
-export type NewMediaSeriesPitch = { name: string; angle: string; channels: string[]; audience?: string };
+export const MEDIA_SERIES_SOURCE_TOPICS = [
+  { key: 'hobbies', label: 'Hobbies & practice' },
+  { key: 'books', label: 'Books & highlights' },
+  { key: 'companies', label: 'Companies & founder life' },
+  { key: 'projects', label: 'Projects & builds' },
+  { key: 'tasks', label: 'Task milestones' },
+  { key: 'journal', label: 'Journal reflections (private by default)' },
+  { key: 'brain-dump', label: 'Ideas & brain dump (private by default)' },
+  { key: 'daily-life', label: 'Daily life & routines' },
+  { key: 'travel', label: 'Travel & places' },
+  { key: 'pets', label: 'Dogs & pets' },
+  { key: 'health-routines', label: 'Fitness routines (privacy-gated)' },
+  { key: 'world-cultures', label: 'Countries, traditions & learning' },
+] as const;
+export type NewMediaSeriesPitch = {
+  name: string; angle: string; channels: string[]; audience?: string;
+  sourceTopics?: string[]; topicKeywords?: string[]; creativeDirection?: string;
+};
 export type MediaSeriesDesign = {
   score: number; verdict: 'strong' | 'refine' | 'weak'; strengths: string[];
   risks: string[]; improvements: string[]; aiAssisted: boolean; warning?: string;
@@ -1591,6 +1610,20 @@ export async function createMediaSeries(pitch: NewMediaSeriesPitch & { design?: 
     body: JSON.stringify(pitch),
   });
   return parseResponse<{key: string; name: string; status: string}>(response);
+}
+
+export async function updateMediaSeries(key: string, pitch: NewMediaSeriesPitch) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/${encodeURIComponent(key)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(pitch),
+  });
+  return parseResponse<{ key: string; name: string; status: string }>(response);
+}
+export async function removeMediaSeries(key: string) {
+  const response = await fetch(`${ADMIN_API_URL}/media/core/series/${encodeURIComponent(key)}`, {
+    method: 'DELETE', headers: { 'Accept': 'application/json' },
+  });
+  return parseResponse<{ key: string; removed: boolean; historicalPostsPreserved: boolean }>(response);
 }
 
 export interface MediaSeriesRecommendation {

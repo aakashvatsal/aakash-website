@@ -453,7 +453,7 @@ export function AdminMobileHeader() {
       </header>
 
       {open ? (
-        <div className="fixed inset-0 z-40 overflow-y-auto bg-[#030608] px-4 pb-8 pt-20 lg:hidden">
+        <div className="admin-nav-scroll fixed inset-0 z-40 overflow-y-auto bg-[#030608] px-4 pb-8 pt-20 lg:hidden">
           <nav className="space-y-2">
             {navigation.map(
               (item) => {

@@ -148,60 +148,9 @@ const navigation: NavigationItem[] = [
     ],
   },
   {
-    title: "Media",
+    title: "Media Studio",
+    href: "/admin/media",
     icon: Radio,
-    children: [
-      {
-        title: "Today",
-        href: "/admin/media/today",
-        icon: Clock3,
-      },
-      {
-        title: "Media Brain",
-        href: "/admin/media/brain",
-        icon: Brain,
-      },
-      {
-        title: "7-Day Plan",
-        href: "/admin/media/plan",
-        icon: CalendarDays,
-      },
-      {
-        title: "Create / Production",
-        href: "/admin/media/production",
-        icon: Clapperboard,
-      },
-      {
-        title: "Engagement",
-        href: "/admin/media/engagement",
-        icon: MessageCircle,
-      },
-      {
-        title: "Performance",
-        href: "/admin/media/growth",
-        icon: TrendingUp,
-      },
-      {
-        title: "Content Analytics",
-        href: "/admin/media/analytics",
-        icon: BarChart3,
-      },
-      {
-        title: "Network",
-        href: "/admin/media/network",
-        icon: Network,
-      },
-      {
-        title: "Library",
-        href: "/admin/media/library",
-        icon: BookOpen,
-      },
-      {
-        title: "Advanced",
-        href: "/admin/media/system",
-        icon: Settings,
-      },
-    ],
   },
   {
     title: "Hobbies",
@@ -416,7 +365,7 @@ export function AdminSidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-6">
+      <nav className="admin-nav-scroll flex-1 space-y-1 overflow-y-auto px-4 py-6">
         {navigation.map((item) => {
           const Icon = item.icon;
 
