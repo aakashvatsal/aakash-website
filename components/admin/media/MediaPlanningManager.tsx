@@ -1175,6 +1175,8 @@ function Execution({
   storyArc?: MediaPlanningStoryArc;
 }) {
   const isSkip = item.action === "skip";
+  const isVideoFormat = ["reel", "short", "video", "long_video"].includes(item.format);
+  const isVisualFormat = ["image", "carousel", "story"].includes(item.format);
   const isUnwritten = item.editorialVersion === "offline-research-v2" || /Deterministic offline editorial completion|Offline research only/i.test(item.reason || "");
   const readinessIssues = safeArray(item.readinessIssues);
   const hashtags = safeArray(item.hashtags);
@@ -1288,10 +1290,10 @@ function Execution({
             <div className="overflow-hidden rounded-2xl border border-[#C6FF32]/25 bg-gradient-to-br from-[#C6FF32]/12 via-black/40 to-sky-400/5 p-4">
               <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#C6FF32]">Hook Studio · Selected opening</p>
               <p className="text-lg font-semibold leading-snug text-white">“{item.hook}”</p>
-              {item.openingVisual && <p className="mt-2 text-xs leading-relaxed text-white/65"><span className="font-semibold text-sky-200">First frame:</span> {item.openingVisual}</p>}
+              {!(["text", "article", "poll", "thread"].includes(item.format)) && item.openingVisual && <p className="mt-2 text-xs leading-relaxed text-white/65"><span className="font-semibold text-sky-200">First frame:</span> {item.openingVisual}</p>}
               {!!item.hookAlternatives?.length && (
                 <div className="mt-3 border-t border-white/10 pt-3">
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/45">Alternative hook angles · use only after matching the first spoken line</p>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-white/45">Alternative hook angles · use only after matching the first publishable line</p>
                   <div className="grid gap-2 md:grid-cols-2">
                     {item.hookAlternatives.map((line, index) => (
                       <div key={`${index}-${line}`} className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
@@ -1326,13 +1328,13 @@ function Execution({
             <CopyField label={publishLabel} value={publishCopy} primary />
           ) : null}
 
-          {imageBrief?.mode && imageBrief.mode !== "none" ? (
+          {isVisualFormat && imageBrief?.mode && imageBrief.mode !== "none" ? (
             <ImagePack brief={imageBrief} />
           ) : null}
-          {carouselSlides.length ? (
+          {item.format === "carousel" && carouselSlides.length ? (
             <CarouselPack slides={carouselSlides} />
           ) : null}
-          {videoPack?.fullScript ? <VideoPack pack={videoPack} /> : null}
+          {isVideoFormat && videoPack?.fullScript ? <VideoPack pack={videoPack} /> : null}
           {xThread.length ? (
             <SequencePack title="X thread · every post" values={xThread} />
           ) : null}

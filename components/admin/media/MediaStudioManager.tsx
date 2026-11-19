@@ -208,6 +208,8 @@ export function MediaStudioManager() {
   }, [tab]);
 
   const selectedDay = overview?.days[dayIndex];
+  const isVideoPost = selectedPost ? ['reel', 'short', 'long_video'].includes(selectedPost.format) : false;
+  const isTextPost = selectedPost?.format === 'text';
   const active = series.filter((x) => x.status === "active").length;
   const totalReady =
     overview?.days.reduce((n, d) => n + d.counts.ready, 0) || 0;
@@ -1189,12 +1191,12 @@ export function MediaStudioManager() {
         <section className="space-y-4">
           <div>
             <h2 className="text-xl font-black">
-              Your word-for-word studio
+              Your content studio
             </h2>
 
             <p className="text-sm text-white/55">
-              Choose a post from the calendar to see the exact
-              copy, scripts and filming instructions.
+              Choose a post from the calendar to see publishable text,
+              visual assets, or video production instructions as appropriate.
             </p>
           </div>
 
@@ -1312,7 +1314,9 @@ export function MediaStudioManager() {
                         )} · Delivery: ${cap(
                           currentRelease.deliveryStatus
                         )}`
-                      : "No production draft yet. Writing ready is not filming, approval or publication."}
+                      : isTextPost
+                        ? "No publishing draft yet. Writing ready is not approval or publication."
+                        : "No production draft yet. Writing ready is not filming, approval or publication."}
                   </p>
 
                   {currentRelease?.publicationId ? (
@@ -1357,9 +1361,9 @@ export function MediaStudioManager() {
                   )}
 
                   <p className="text-xs text-white/45">
-                    No automatic publishing or fabricated delivery
-                    confirmation. Attach real assets, finish
-                    production and pass human preflight first.
+                    {isTextPost
+                      ? "No automatic publishing. Review the final text and pass human preflight before scheduling."
+                      : "No automatic publishing or fabricated delivery confirmation. Attach real assets, finish production and pass human preflight first."}
                   </p>
                 </div>
 
@@ -1398,80 +1402,54 @@ export function MediaStudioManager() {
               </div>
 
               <div className="grid gap-4 lg:grid-cols-2">
-                <CopyPanel
-                  title="Selected opening hook"
-                  value={selectedPost.hook}
-                />
+                <CopyPanel title="Selected opening hook" value={selectedPost.hook} />
+                <CopyPanel title="Alternative hooks" value={selectedPost.hookAlternatives.join("\n\n")} />
 
-                <CopyPanel
-                  title="Alternative hooks"
-                  value={selectedPost.hookAlternatives.join("\n\n")}
-                />
-
-                <CopyPanel
-                  title="Word-for-word script"
-                  value={selectedPost.script}
-                />
-
-                <CopyPanel
-                  title="Direct-to-post copy"
-                  value={selectedPost.copy}
-                />
-
-                <CopyPanel
-                  title="Final caption"
-                  value={selectedPost.caption}
-                />
-
-                <CopyPanel
-                  title="Cover / thumbnail"
-                  value={selectedPost.cover}
-                />
-
-                <CopyPanel
-                  title="Where to shoot"
-                  value={selectedPost.shotLocation}
-                />
-
-                <CopyPanel
-                  title="Pinned comment"
-                  value={selectedPost.pinnedComment}
-                />
+                {isTextPost ? (
+                  <CopyPanel title="Publish-ready post" value={selectedPost.copy} />
+                ) : isVideoPost ? (
+                  <>
+                    <CopyPanel title="Word-for-word script" value={selectedPost.script} />
+                    {!!selectedPost.copy && <CopyPanel title="Post description" value={selectedPost.copy} />}
+                    <CopyPanel title="Final caption" value={selectedPost.caption} />
+                    <CopyPanel title="Cover / thumbnail" value={selectedPost.cover} />
+                    <CopyPanel title="Where to shoot" value={selectedPost.shotLocation} />
+                  </>
+                ) : (
+                  <>
+                    <CopyPanel title="Direct-to-post copy" value={selectedPost.copy} />
+                    <CopyPanel title="Final caption" value={selectedPost.caption} />
+                    <CopyPanel title="Cover / visual direction" value={selectedPost.cover} />
+                    <CopyPanel title="Where to capture visuals" value={selectedPost.shotLocation} />
+                  </>
+                )}
+                <CopyPanel title="Pinned comment" value={selectedPost.pinnedComment} />
               </div>
 
-              {!!selectedPost.shotList.length && (
-                <div className="rounded-2xl border border-white/10 p-5">
-                  <h3 className="font-black">
-                    Exactly what to shoot
-                  </h3>
+              {isTextPost && selectedPost.platform === "x" && (
+                <p className={`text-xs ${selectedPost.copy.length > 280 ? "text-amber-300" : "text-white/50"}`}>
+                  X post: {selectedPost.copy.length}/280 characters
+                  {selectedPost.copy.length > 280 && " · Shorten the post before publishing."}
+                </p>
+              )}
 
+              {isVideoPost && !!selectedPost.shotList?.length && (
+                <div className="rounded-2xl border border-white/10 p-5">
+                  <h3 className="font-black">Exactly what to shoot</h3>
                   <div className="mt-3 grid gap-3">
                     {selectedPost.shotList.map((shot, i) => (
-                      <div
-                        key={i}
-                        className="rounded-xl bg-white/[0.03] p-3 text-sm"
-                      >
-                        <span className="font-bold text-lime-300">
-                          {shot.time}
-                        </span>{" "}
+                      <div key={i} className="rounded-xl bg-white/[0.03] p-3 text-sm">
+                        <span className="font-bold text-lime-300">{shot.time}</span>{" "}
                         · {shot.shot}
-
-                        <p className="mt-1 text-white/60">
-                          {shot.direction}
-                        </p>
-
-                        {shot.spokenLine && (
-                          <p className="mt-1 italic">
-                            {shot.spokenLine}
-                          </p>
-                        )}
+                        <p className="mt-1 text-white/60">{shot.direction}</p>
+                        {shot.spokenLine && <p className="mt-1 italic">{shot.spokenLine}</p>}
                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {!!selectedPost.slides.length && (
+              {!isTextPost && !!selectedPost.slides?.length && (
                 <div className="rounded-2xl border border-white/10 p-5">
                   <h3 className="font-black">Slides / frames</h3>
 
