@@ -19,10 +19,12 @@ import {
 type Workspace = {
   teamId: string;
   teamName: string;
+  fraytoCompanyId?: string | null;
   connected: boolean;
   enabled: boolean;
   approvalStatus: "pending" | "approved" | "rejected";
   restrictChannelUsers: boolean;
+  monitorChannels: boolean;
   allowDMs: boolean;
   allowedChannelIds: string[];
   allowedUserIds: string[];
@@ -96,6 +98,7 @@ function WorkspaceEditor({
     workspace.restrictChannelUsers,
   );
   const [allowDMs, setAllowDMs] = useState(workspace.allowDMs);
+  const [monitorChannels, setMonitorChannels] = useState(workspace.monitorChannels ?? false);
   const [channels, setChannels] = useState(
     workspace.allowedChannelIds.join(", "),
   );
@@ -118,6 +121,7 @@ function WorkspaceEditor({
           enabled,
           allowDMs,
           restrictChannelUsers,
+          monitorChannels,
           allowedChannelIds: csv(channels),
           allowedUserIds: csv(users),
         }),
@@ -159,6 +163,9 @@ function WorkspaceEditor({
           <p className="font-bold text-white">{workspace.teamName}</p>
           <p className="text-xs text-white/40">
             Workspace ID: {workspace.teamId}
+          </p>
+          <p className="mt-1 text-xs text-white/45">
+            Frayto operations: {workspace.fraytoCompanyId ? "Workspace mapped (Frayto API connection still requires verification)" : "Not configured"}
           </p>
         </div>
         <span
@@ -208,7 +215,7 @@ function WorkspaceEditor({
             className="w-full rounded-xl border border-white/10 bg-white/[0.04] p-3 text-sm text-white outline-none focus:border-[#C6FF32]/40"
           />
           <p className="text-xs text-white/35">
-            Only @Hsakaa mentions in these channels are processed.
+            @HSAKAA mentions are processed. Optional channel monitoring also handles ordinary requests in listed channels once Slack history permissions are granted.
           </p>
         </div>
         <div className="space-y-2">
@@ -244,6 +251,15 @@ function WorkspaceEditor({
             className="accent-[#C6FF32]"
           />{" "}
           Require approved members in channels
+        </label>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-white/75">
+          <input
+            type="checkbox"
+            checked={monitorChannels}
+            onChange={(e) => setMonitorChannels(e.target.checked)}
+            className="accent-[#C6FF32]"
+          />{" "}
+          Monitor regular messages in allowed channels (requires Slack history scopes)
         </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm text-white/75">
           <input
