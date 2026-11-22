@@ -1,4 +1,5 @@
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { SlackIntegration } from "@/components/admin/settings/SlackIntegration";
 import { IntegrationsStatus } from "@/components/admin/settings/IntegrationsStatus";
 import { getIntegrationsOverview } from "@/lib/api/health-extended";
 
@@ -10,6 +11,7 @@ export default async function AdminSettingsPage() {
     return (
       <div className="space-y-6">
         <AdminPageHeader eyebrow="Personal OS" title="Settings & Integrations" description="Check connected health and media providers without exposing server credentials." />
+        <SlackIntegration />
         <IntegrationsStatus overview={overview} />
       </div>
     );
@@ -17,6 +19,7 @@ export default async function AdminSettingsPage() {
     return (
       <div className="space-y-6">
         <AdminPageHeader eyebrow="Personal OS" title="Settings & Integrations" description="Integration configuration and connection status." />
+        <SlackIntegration />
         <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300">{error instanceof Error ? error.message : "Failed to load integrations."}</div>
       </div>
     );
